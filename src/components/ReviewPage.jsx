@@ -1,6 +1,7 @@
 import ReviewApprovalUI from "./ReviewApprovalUI";
 import { useMemo, useState } from "react";
 import productData from "../data/product.json";
+import { pendingProducts } from "../data/product.json";
 
 const ReviewPage = () => {
   const [reviewed, setReviewed] = useState([]);
@@ -20,19 +21,6 @@ const ReviewPage = () => {
             : JSON.stringify(value, null, 2), // ✅ formatted JSON for better readability
       }))
     : [];
-
-  const productFields = [
-    { label: "Product Name", value: "iPhone 15 Pro" },
-    { label: "Product Name 2", value: "iPhone 14 Pro" },
-    { label: "Product Name 3", value: "iPhone 13 Pro" },
-    { label: "Product Name 4", value: "iPhone 12 Pro" },
-    { label: "Product Name 5", value: "iPhone 11 Pro" },
-    { label: "Product Name 6", value: "iPhone X" },
-    { label: "Product Name 7", value: "iPhone 8" },
-    { label: "Product Name 8", value: "iPhone 7" },
-    { label: "Product Name 9", value: "iPhone 6" },
-    { label: "Product Name 10", value: "iPhone 5" },
-  ];
 
   // ✅ Compute progress
   const progress = useMemo(() => {
@@ -92,24 +80,35 @@ const ReviewPage = () => {
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className=" flex flex-col border-b border-gray-200">
-          <div className=" bg-white left-0 z-10 w-full min-h-[87.99px] flex items-center text-gray-700 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {productFields.map((item, index) => (
+          <div className="bg-white left-0 z-10 w-full min-h-[100px] flex items-center text-gray-700 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] shadow-sm">
+            {pendingProducts.map((item, index) => (
               <div
                 key={index}
-                className={`min-w-[150px] ${
-                  index === 0 ? "border-b-4 border-b-blue-600" : ""
-                } h-full px-4 flex flex-col items-center justify-center border-r-2 border-black/5 last:border-none hover:bg-blue-50 transition-all duration-200`}
+                className={`min-w-[180px] ${
+                  index === 0
+                    ? "bg-yellow-100 border-b-4 border-yellow-500"
+                    : ""
+                } h-full px-4 py-2 flex flex-col items-center justify-center border-r border-gray-200 hover:bg-blue-50 transition-all duration-200 cursor-pointer`}
+                // onClick={() => setCurrentIndex(index)}
               >
-                <div className="font-semibold text-sm text-gray-800 whitespace-nowrap">
-                  {item.label}
-                </div>
-                <div className="text-sm text-gray-600 mt-1 whitespace-nowrap">
-                  {item.value}
-                </div>
+                <img
+                  src={item.logo}
+                  alt={item.name}
+                  className="w-10 h-10 object-contain rounded-md"
+                />
+                <div className="font-semibold text-sm mt-2">{item.name}</div>
+                <div className="text-xs text-gray-500">{item.company}</div>
+                <span className="mt-1 text-[11px] bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">
+                  Pending Review
+                </span>
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between min-h-[87.99px] px-8 shadow">
+        </div>
+
+        {/* Cards Section */}
+        <div className="overflow-auto relative">
+          <div className="sticky top-0 left-0 flex items-center justify-between min-h-[87.99px] px-8 shadow bg-white z-10 border-b border-gray-200">
             {/* Progress Bar */}
             <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
               <div
@@ -125,10 +124,6 @@ const ReviewPage = () => {
               </span>
             </div>
           </div>
-        </div>
-
-        {/* Cards Section */}
-        <div className="overflow-auto">
           <ReviewApprovalUI
             reviewed={reviewed}
             fieldsToReview={fieldsToReview}
@@ -137,14 +132,14 @@ const ReviewPage = () => {
             setReviewed={setReviewed}
           />
         </div>
-        <footer className="h-20 bg-white flex items-center justify-end gap-4 px-6 shadow-inner border-t border-gray-200">
+        {/* <footer className="h-20 bg-white flex items-center justify-end gap-4 px-6 shadow-inner border-t border-gray-200">
           <button className="bg-blue-600 text-white min-w-[150px] h-12 rounded-lg hover:bg-blue-700 transition">
             Prev
           </button>
           <button className="bg-blue-600 text-white min-w-[150px] h-12 rounded-lg hover:bg-blue-700 transition">
             Next
           </button>
-        </footer>
+        </footer> */}
       </main>
     </div>
   );

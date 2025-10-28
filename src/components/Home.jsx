@@ -1,43 +1,9 @@
 import { Search, Clock, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { pendingProducts } from "../data/product.json";
 
 export const Home = () => {
   const Navigate = useNavigate();
-  const pendingProducts = [
-    {
-      id: "62cfea81a10437da5c6c65da",
-      logo: "https://zoftware-logo.s3.ap-south-1.amazonaws.com/1724661707672.webp",
-      name: "Mailchimp",
-      company: "Mailchimp Inc.",
-      created_on: "2022-06-22",
-      description:
-        "Cloud-based marketing automation platform for email and campaign management.",
-      category: ["Marketing", "Automation"],
-      status: "Pending Review",
-    },
-    {
-      id: "62cffb9a3d2a37dfbc6c78e2",
-      logo: "https://zoftware-logo.s3.ap-south-1.amazonaws.com/1724661800124.webp",
-      name: "Slack",
-      company: "Slack Technologies",
-      created_on: "2023-03-18",
-      description:
-        "Collaboration and messaging tool designed for teams to communicate efficiently.",
-      category: ["Communication", "Productivity"],
-      status: "Pending Review",
-    },
-    {
-      id: "62d00a713a04c8bfab7d91c2",
-      logo: "https://zoftware-logo.s3.ap-south-1.amazonaws.com/1724661823456.webp",
-      name: "Canva",
-      company: "Canva Pty Ltd",
-      created_on: "2023-07-09",
-      description:
-        "Online graphic design tool used for creating visuals, presentations, and social media content.",
-      category: ["Design", "Marketing"],
-      status: "Pending Review",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
