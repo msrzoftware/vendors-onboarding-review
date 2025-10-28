@@ -254,7 +254,7 @@ export default function ReviewApprovalUI({
 
                 {/* Collapsible Content */}
                 {isOpen && !isReviewed && (
-                  <div className="p-4 border-t bg-gray-50 text-sm text-gray-700 animate-fadeIn">
+                  <div className="p-4 border-t rounded-xl bg-gray-50 text-sm text-gray-700 animate-fadeIn">
                     {field.value}
                   </div>
                 )}
