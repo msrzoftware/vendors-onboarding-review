@@ -1,11 +1,25 @@
-import { CheckCircle, XCircle, Clock, User } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import ReviewApprovalUI from "./ReviewApprovalUI";
 import { useMemo, useState } from "react";
+import productData from "../data/product.json";
 
 const ReviewPage = () => {
-  const location = useLocation();
-  const product = location.state;
+  const [reviewed, setReviewed] = useState([]);
+  const [expanded, setExpanded] = useState([]);
+
+  // ✅ Access the fieldsToReview object (make sure there’s no trailing space in JSON key)
+  const currentProduct = productData.fieldsToReview;
+
+  // ✅ Convert the JSON object into an array of key-value pairs for rendering
+  const fieldsToReview = currentProduct
+    ? Object.entries(currentProduct).map(([key, value]) => ({
+        key,
+        label: key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), // "product_name" → "Product Name"
+        value:
+          typeof value === "string" || typeof value === "number"
+            ? value
+            : JSON.stringify(value, null, 2), // ✅ formatted JSON for better readability
+      }))
+    : [];
 
   const productFields = [
     { label: "Product Name", value: "iPhone 15 Pro" },
@@ -20,86 +34,57 @@ const ReviewPage = () => {
     { label: "Product Name 10", value: "iPhone 5" },
   ];
 
-  const fieldsToReview = [
-    {
-      key: "product_name",
-      label: "Product Name",
-      value: product?.name || "N/A",
-    },
-    {
-      key: "description",
-      label: "Description",
-      value:
-        product?.description ||
-        "Mailchimp is a leading cloud-based marketing automation platform...",
-    },
-    {
-      key: "overview",
-      label: "Overview",
-      value:
-        "This product provides tools for businesses to manage their campaigns effectively.",
-    },
-    {
-      key: "pricing",
-      label: "Pricing",
-      value: "4 plans: Free, Essentials, Standard, Premium",
-    },
-    {
-      key: "integrations",
-      label: "Integrations",
-      value: "Google Drive, Slack, Trello, PayPal, Asana",
-    },
-    {
-      key: "usp",
-      label: "USP",
-      value: "User-friendly interface with multiple pricing tiers",
-    },
-  ];
-  const [reviewed, setReviewed] = useState([]);
-  const [expanded, setExpanded] = useState([]);
-
-  const progress = useMemo(
-    () => Math.round((reviewed.length / fieldsToReview.length) * 100),
-    [reviewed, fieldsToReview.length]
-  );
+  // ✅ Compute progress
+  const progress = useMemo(() => {
+    if (!fieldsToReview.length) return 0;
+    return Math.round((reviewed.length / fieldsToReview.length) * 100);
+  }, [reviewed, fieldsToReview.length]);
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-[33%] bg-white shadow-lg hidden md:flex flex-col">
-        <div className="flex items-center gap-2 py-1.5 px-2 bg-slate-50">
+      <aside className="w-[33%] bg-white shadow-lg hidden md:flex flex-col max-h-screen">
+        <div className="flex items-center gap-2 py-3 px-4 bg-slate-50 border-b border-gray-200">
           <img
-            src={product?.logo}
-            alt={product?.name}
+            src={currentProduct?.logo_url}
+            alt={currentProduct?.product_name}
             className="w-16 h-16 rounded-xl object-cover"
           />
-
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800">
-              {product?.name}
+            <h2 className="text-xl font-semibold text-gray-800">
+              {currentProduct?.product_name || "Unnamed Product"}
             </h2>
-            <p className="text-gray-600 text-sm">{product?.company}</p>
+            <p className="text-gray-600 text-sm">
+              {currentProduct?.company || "Company"}
+            </p>
             <span className="text-yellow-600 text-sm font-medium">
-              {product?.status}
+              {currentProduct?.subscription_plan || "Basic"}
             </span>
           </div>
         </div>
-        <nav className="flex flex-col">
-          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-yellow-100 px-5 py-3 text-left border-b border-indigo-600/5">
-            optionnnnnnn
-          </button>
-          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-green-100 px-5 py-3 text-left border-b border-indigo-600/5">
-            optionnnnnnn
-          </button>
-          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-gray-100 px-5 py-3 text-left borde-b border-indigo-600/5">
-            optiooptionnnnnnnnn
-          </button>
-          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-gray-100 px-5 py-3 text-left borde-b border-indigo-600/5">
-            optiooptionnnnnnnnn
-          </button>{" "}
-          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-gray-100 px-5 py-3 text-left borde-b border-indigo-600/5">
-            optiooptionnnnnnnnn
-          </button>
+
+        {/* Sidebar Navigation */}
+        <nav className="flex flex-col overflow-y-auto">
+          {fieldsToReview.map((field) => {
+            const isReviewed = reviewed.includes(field.key); // ✅ check if reviewed
+            const isCurrent = expanded.includes(field.key); // ✅ check if this field is currently expanded (active)
+            return (
+              <button
+                key={field.key}
+                className={`text-gray-700 font-medium text-left border-b border-gray-200 px-5 py-3 transition-all duration-200
+                  hover:text-indigo-600 hover:bg-indigo-50
+                  ${
+                    isCurrent
+                      ? "bg-yellow-100 text-yellow-800" // ✅ active field being reviewed
+                      : isReviewed
+                      ? "bg-green-100 text-green-800" // ✅ reviewed/approved fields
+                      : "bg-gray-100"
+                  }`}
+              >
+                {field.label}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
