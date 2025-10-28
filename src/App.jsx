@@ -1,5 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import Flow from "./components/Flow.jsx";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import ReviewScreenLayout from "./components/ReviewPage.jsx";
 import { Home } from "./components/Home.jsx";
 export default function App() {
@@ -7,7 +6,6 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/onboarding" element={<Flow />} />
         <Route path="/review" element={<ReviewScreenLayout />} />
       </Routes>
     </Router>
