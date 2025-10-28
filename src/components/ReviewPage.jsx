@@ -108,7 +108,7 @@ const ReviewPage = () => {
 
         {/* Cards Section */}
         <div className="overflow-auto relative">
-          <div className="sticky top-0 left-0 flex items-center justify-between min-h-[87.99px] px-8 shadow bg-white z-10 border-b border-gray-200">
+          <div className="sticky top-0 left-0 flex items-center justify-between min-h-[87.99px] px-8 bg-white z-10 border-b border-gray-200">
             {/* Progress Bar */}
             <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
               <div

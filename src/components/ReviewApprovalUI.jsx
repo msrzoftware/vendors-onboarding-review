@@ -125,7 +125,13 @@
 
 /** ============================== VARIATION - 2 ============================ */
 import React, { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Circle, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  CheckCircle2,
+  Circle,
+  ChevronUp,
+  ChevronDown,
+  Ellipsis,
+} from "lucide-react";
 
 export default function ReviewApprovalUI({
   reviewed,
@@ -186,7 +192,7 @@ export default function ReviewApprovalUI({
 
   return (
     <div className="w-full min-h-screen bg-gray-50 overflow-y-auto">
-      <div className="max-w-full min-h-screen mx-auto bg-white p-6 space-y-6 border border-gray-200">
+      <div className="max-w-full min-h-screen mx-auto bg-white p-6 space-y-6">
         <div className="space-y-4">
           {fieldsToReview.map((field) => {
             const isOpen = expanded.includes(field.key);
@@ -234,12 +240,15 @@ export default function ReviewApprovalUI({
                       )}
                     </button>
 
-                    {!isReviewed &&
-                      (isOpen ? (
-                        <ChevronUp className="text-gray-500 transition-transform duration-300" />
-                      ) : (
-                        <ChevronDown className="text-gray-500 transition-transform duration-300" />
-                      ))}
+                    <div className="flex items-center gap-2.5">
+                      {!isReviewed &&
+                        (isOpen ? (
+                          <ChevronUp className="text-gray-500 transition-transform duration-300" />
+                        ) : (
+                          <ChevronDown className="text-gray-500 transition-transform duration-300" />
+                        ))}
+                      <Ellipsis />
+                    </div>
                   </div>
                 </div>
 
