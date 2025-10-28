@@ -12,15 +12,32 @@ const ReviewPage = () => {
 
   // ✅ Convert the JSON object into an array of key-value pairs for rendering
   const fieldsToReview = currentProduct
-    ? Object.entries(currentProduct).map(([key, value]) => ({
-        key,
-        label: key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), // "product_name" → "Product Name"
-        value:
-          typeof value === "string" || typeof value === "number"
-            ? value
-            : JSON.stringify(value, null, 2), // ✅ formatted JSON for better readability
-      }))
+    ? Object.entries(currentProduct).map(([key, value]) => {
+        let displayValue;
+
+        if (value === null || value === undefined) {
+          displayValue = "—"; // graceful null/undefined
+        } else if (Array.isArray(value)) {
+          displayValue = value; // keep as array
+        } else if (typeof value === "object") {
+          displayValue = JSON.stringify(value, null, 2); // pretty-print object
+        } else if (typeof value === "boolean") {
+          displayValue = value ? "True" : "False"; // readable boolean
+        } else {
+          displayValue = value; // number or string
+        }
+
+        return {
+          key,
+          label: key
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase()),
+          value: displayValue,
+        };
+      })
     : [];
+
+  console.log("fieldsToReview", fieldsToReview);
 
   // ✅ Compute progress
   const progress = useMemo(() => {
@@ -31,7 +48,7 @@ const ReviewPage = () => {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-[33%] bg-white shadow-lg hidden md:flex flex-col max-h-screen">
+      <aside className="w-[28%] bg-white shadow-lg hidden md:flex flex-col max-h-screen">
         <div className="flex items-center gap-2 py-3 px-4 bg-slate-50 border-b border-gray-200">
           <img
             src={currentProduct?.logo_url}
@@ -126,10 +143,10 @@ const ReviewPage = () => {
           </div>
           <ReviewApprovalUI
             reviewed={reviewed}
-            fieldsToReview={fieldsToReview}
             expanded={expanded}
             setExpanded={setExpanded}
             setReviewed={setReviewed}
+            fieldsToReview={fieldsToReview}
           />
         </div>
         {/* <footer className="h-20 bg-white flex items-center justify-end gap-4 px-6 shadow-inner border-t border-gray-200">

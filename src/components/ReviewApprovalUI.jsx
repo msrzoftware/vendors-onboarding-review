@@ -255,7 +255,98 @@ export default function ReviewApprovalUI({
                 {/* Collapsible Content */}
                 {isOpen && !isReviewed && (
                   <div className="p-4 border-t rounded-xl bg-gray-50 text-sm text-gray-700 animate-fadeIn">
-                    {field.value}
+                    {(() => {
+                      const v = field.value;
+
+                      // Case 1: Array of objects or primitives
+                      if (Array.isArray(v)) {
+                        if (v.length === 0) {
+                          return (
+                            <span className="text-gray-500 italic">
+                              Empty Array
+                            </span>
+                          );
+                        }
+
+                        // Check if array contains objects
+                        const isArrayOfObjects = v.every(
+                          (item) => typeof item === "object" && item !== null
+                        );
+
+                        if (isArrayOfObjects) {
+                          // Render as list of cards
+                          return (
+                            <div className="space-y-3">
+                              {v.map((obj, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm"
+                                >
+                                  {Object.entries(obj).map(([k, val]) => (
+                                    <div
+                                      key={k}
+                                      className="flex items-start gap-2 text-sm"
+                                    >
+                                      <span className="font-medium text-gray-700 min-w-28 capitalize">
+                                        {k.replace(/_/g, " ")}:
+                                      </span>
+                                      <span className="text-gray-800">
+                                        {Array.isArray(val) ? (
+                                          <ul className="list-disc pl-5 space-y-0.5">
+                                            {val.map((item, i) => (
+                                              <li key={i}>
+                                                {item?.toString?.() ?? "—"}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        ) : typeof val === "object" &&
+                                          val !== null ? (
+                                          <pre className="whitespace-pre-wrap text-gray-800 bg-gray-50 rounded-lg p-1">
+                                            {JSON.stringify(val, null, 2)}
+                                          </pre>
+                                        ) : (
+                                          val?.toString?.() ?? "—"
+                                        )}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        } else {
+                          // Render array of primitive values
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              {v.map((item, i) => (
+                                <span
+                                  key={i}
+                                  className="px-3 py-1 bg-white border border-gray-300 rounded-full text-gray-800 text-sm"
+                                >
+                                  {item?.toString?.() ?? "—"}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+                      }
+
+                      // Case 2: Object (non-array)
+                      if (typeof v === "object" && v !== null) {
+                        return (
+                          <pre className="whitespace-pre-wrap bg-white border border-gray-200 rounded-lg p-3 text-gray-800 overflow-x-auto">
+                            {JSON.stringify(v, null, 2)}
+                          </pre>
+                        );
+                      }
+
+                      // Case 3: Primitives (string, number, boolean, null)
+                      return (
+                        <pre className="whitespace-pre-wrap">
+                          {v?.toString?.() ?? "—"}
+                        </pre>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
