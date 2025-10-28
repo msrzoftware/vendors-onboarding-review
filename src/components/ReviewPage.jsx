@@ -66,7 +66,7 @@ const ReviewPage = () => {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-[300px] bg-white shadow-lg hidden md:flex flex-col">
+      <aside className="w-[33%] bg-white shadow-lg hidden md:flex flex-col">
         <div className="flex items-center gap-2 py-1.5 px-2 bg-slate-50">
           <img
             src={product?.logo}
@@ -91,7 +91,13 @@ const ReviewPage = () => {
           <button className="text-gray-700 font-medium hover:text-indigo-600 bg-green-100 px-5 py-3 text-left border-b border-indigo-600/5">
             optionnnnnnn
           </button>
-          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-blue-100 px-5 py-3 text-left borde-b border-indigo-600/5">
+          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-gray-100 px-5 py-3 text-left borde-b border-indigo-600/5">
+            optiooptionnnnnnnnn
+          </button>
+          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-gray-100 px-5 py-3 text-left borde-b border-indigo-600/5">
+            optiooptionnnnnnnnn
+          </button>{" "}
+          <button className="text-gray-700 font-medium hover:text-indigo-600 bg-gray-100 px-5 py-3 text-left borde-b border-indigo-600/5">
             optiooptionnnnnnnnn
           </button>
         </nav>
