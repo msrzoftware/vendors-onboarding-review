@@ -59,14 +59,14 @@ const ReviewPage = () => {
             return (
               <button
                 key={field.key}
-                className={`text-gray-700 font-medium text-left border-b border-gray-200 px-5 py-3 transition-all duration-200
+                className={`text-gray-700 font-medium text-left border-b border-gray-200/60 px-5 py-3 transition-all duration-200
                   hover:text-indigo-600 hover:bg-indigo-50
                   ${
                     isCurrent
                       ? "bg-yellow-100 text-yellow-800" // ✅ active field being reviewed
                       : isReviewed
                       ? "bg-green-100 text-green-800" // ✅ reviewed/approved fields
-                      : "bg-gray-100"
+                      : "bg-gray-50"
                   }`}
               >
                 {field.label}
