@@ -1,188 +1,51 @@
-/** ============================== VARIATION - 1 ============================ */
-// import { useRef, useEffect } from "react";
-// import { CheckCircle2, Circle, ChevronDown, ChevronUp } from "lucide-react";
-
-// export default function ReviewApprovalUI({
-//   reviewed,
-//   fieldsToReview,
-//   setExpanded,
-//   setReviewed,
-//   expanded,
-// }) {
-//   const fieldRefs = useRef({});
-
-//   // Toggle expand/collapse
-//   const toggleExpand = (key) => {
-//     setExpanded((prev) =>
-//       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-//     );
-//   };
-
-//   // Toggle reviewed state
-//   const toggleReview = (key) => {
-//     setReviewed((prev) => {
-//       const updated = prev.includes(key)
-//         ? prev.filter((k) => k !== key)
-//         : [...prev, key];
-
-//       // Auto-collapse if newly reviewed
-//       if (!prev.includes(key)) {
-//         setExpanded((exp) => exp.filter((k) => k !== key));
-
-//         // Find next unreviewed field and scroll to it
-//         const currentIndex = fieldsToReview.findIndex((f) => f.key === key);
-//         const nextField = fieldsToReview
-//           .slice(currentIndex + 1)
-//           .find((f) => !prev.includes(f.key));
-
-//         if (nextField && fieldRefs.current[nextField.key]) {
-//           setTimeout(() => {
-//             fieldRefs.current[nextField.key].scrollIntoView({
-//               behavior: "smooth",
-//               block: "center",
-//             });
-//           }, 250); // Delay to allow collapse animation
-//         }
-//       }
-
-//       return updated;
-//     });
-//   };
-
-//   return (
-//     <div className="w-full min-h-screen bg-gray-50 overflow-y-auto">
-//       <div className="max-w-full min-h-screen mx-auto bg-white p-6 space-y-6 border border-gray-200">
-//         <div className="space-y-4">
-//           {fieldsToReview.map((field) => {
-//             const isOpen = expanded.includes(field.key);
-//             const isReviewed = reviewed.includes(field.key);
-
-//             return (
-//               <div
-//                 key={field.key}
-//                 ref={(el) => (fieldRefs.current[field.key] = el)}
-//                 className={`border rounded-xl bg-white shadow-sm transition-all duration-200 ${
-//                   isReviewed
-//                     ? "opacity-60 cursor-not-allowed"
-//                     : "hover:shadow-md"
-//                 }`}
-//               >
-//                 {/* Header Row */}
-//                 <div
-//                   className={`flex items-center justify-between p-4 ${
-//                     isReviewed ? "cursor-not-allowed" : "cursor-pointer"
-//                   }`}
-//                   onClick={() => {
-//                     if (!isReviewed) toggleExpand(field.key);
-//                   }}
-//                 >
-//                   {/* Field Label */}
-//                   <h3 className="font-medium text-gray-700">{field.label}</h3>
-
-//                   {/* Action Buttons */}
-//                   <div className="flex items-center gap-3">
-//                     <button
-//                       onClick={(e) => {
-//                         e.stopPropagation();
-//                         toggleReview(field.key);
-//                       }}
-//                       className={`transition ${
-//                         isReviewed
-//                           ? "text-green-500"
-//                           : "text-gray-500 hover:text-green-500"
-//                       }`}
-//                     >
-//                       {isReviewed ? (
-//                         <CheckCircle2 className="w-6 h-6" />
-//                       ) : (
-//                         <Circle className="w-6 h-6" />
-//                       )}
-//                     </button>
-
-//                     {!isReviewed &&
-//                       (isOpen ? (
-//                         <ChevronUp className="text-gray-500 transition-transform duration-300" />
-//                       ) : (
-//                         <ChevronDown className="text-gray-500 transition-transform duration-300" />
-//                       ))}
-//                   </div>
-//                 </div>
-
-//                 {/* Collapsible Content */}
-//                 {isOpen && !isReviewed && (
-//                   <div className="p-4 border-t bg-gray-50 text-sm text-gray-700 animate-fadeIn">
-//                     {field.value}
-//                   </div>
-//                 )}
-//               </div>
-//             );
-//           })}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-/** ============================== VARIATION - 2 ============================ */
-import React, { useEffect, useRef, useState } from "react";
-import {
-  CheckCircle2,
-  Circle,
-  ChevronUp,
-  ChevronDown,
-  Ellipsis,
-} from "lucide-react";
+import { useRef, useEffect } from "react";
+import { CheckCircle2, Circle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function ReviewApprovalUI({
   reviewed,
   fieldsToReview,
-  setExpanded,
   setReviewed,
-  expanded,
+  currentFieldIndex,
+  setCurrentFieldIndex,
 }) {
   const fieldRefs = useRef({});
-  const [hasAutoExpanded, setHasAutoExpanded] = useState(false);
 
-  // ✅ Expand first card on initial mount (only once)
+  // Scroll to current field when index changes
   useEffect(() => {
-    if (!hasAutoExpanded && fieldsToReview.length > 0) {
-      setExpanded([fieldsToReview[0].key]);
-      setHasAutoExpanded(true);
+    if (currentFieldIndex !== null && fieldsToReview[currentFieldIndex]) {
+      const field = fieldsToReview[currentFieldIndex];
+      const element = fieldRefs.current[field.key];
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
     }
-  }, [fieldsToReview, hasAutoExpanded, setExpanded]);
+  }, [currentFieldIndex, fieldsToReview]);
 
-  // 🔽 Toggle expand/collapse manually
-  const toggleExpand = (key) => {
-    setExpanded((prev) => (prev.includes(key) ? [] : [key]));
-  };
-
-  // ✅ Toggle reviewed + auto expand next
-  const toggleReview = (key) => {
+  // Approve field - mark as reviewed and move to next
+  const approveField = (key) => {
     setReviewed((prev) => {
-      const isAlreadyReviewed = prev.includes(key);
-      const updated = isAlreadyReviewed
+      const updated = prev.includes(key)
         ? prev.filter((k) => k !== key)
         : [...prev, key];
 
-      if (!isAlreadyReviewed) {
-        // Collapse current
-        setExpanded((exp) => exp.filter((k) => k !== key));
-
-        // Find next unreviewed
+      if (!prev.includes(key)) {
+        // Find next unreviewed field
         const currentIndex = fieldsToReview.findIndex((f) => f.key === key);
         const nextField = fieldsToReview
           .slice(currentIndex + 1)
           .find((f) => !updated.includes(f.key));
 
-        // Auto-expand & scroll to next
         if (nextField) {
-          setTimeout(() => {
-            setExpanded([nextField.key]);
-            fieldRefs.current[nextField.key]?.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            });
-          }, 300);
+          const nextIndex = fieldsToReview.findIndex((f) => f.key === nextField.key);
+          setCurrentFieldIndex(nextIndex);
         }
       }
 
@@ -190,302 +53,169 @@ export default function ReviewApprovalUI({
     });
   };
 
-  return (
-    <div className="w-full min-h-screen bg-gray-50 overflow-y-auto">
-      <div className="max-w-full min-h-screen mx-auto bg-white p-6 space-y-6">
-        <div className="space-y-4">
-          {fieldsToReview.map((field) => {
-            const isOpen = expanded.includes(field.key);
-            const isReviewed = reviewed.includes(field.key);
+  // Render field value based on type
+  const renderFieldValue = (value) => {
+    // Case 1: Array of objects
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return <span className="text-muted-foreground italic">Empty Array</span>;
+      }
 
-            return (
-              <div
-                key={field.key}
-                ref={(el) => (fieldRefs.current[field.key] = el)}
-                className={`border rounded-xl bg-white shadow-sm transition-all duration-200 ${
-                  isReviewed
-                    ? "opacity-60 cursor-not-allowed"
-                    : "hover:shadow-md"
-                }`}
-              >
-                {/* Header Row */}
-                <div
-                  className={`flex items-center justify-between p-4 ${
-                    isReviewed ? "cursor-not-allowed" : "cursor-pointer"
-                  }`}
-                  onClick={() => {
-                    if (!isReviewed) toggleExpand(field.key);
-                  }}
-                >
-                  <div className="w-full flex items-center justify-between gap-3">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleReview(field.key);
-                      }}
-                      className={`transition hover:bg-gray-100 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium ${
-                        isReviewed ? "text-green-600" : "text-gray-500"
-                      }`}
-                    >
-                      {isReviewed ? (
-                        <>
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
-                          <span>Approved</span>
-                        </>
-                      ) : (
-                        <>
-                          <Circle className="w-5 h-5 text-gray-500" />
-                          <span>Approve</span>
-                        </>
-                      )}
-                    </button>
+      const isArrayOfObjects = value.every(
+        (item) => typeof item === "object" && item !== null
+      );
 
-                    <div className="flex items-center gap-2.5">
-                      {!isReviewed &&
-                        (isOpen ? (
-                          <ChevronUp className="text-gray-500 transition-transform duration-300" />
-                        ) : (
-                          <ChevronDown className="text-gray-500 transition-transform duration-300" />
-                        ))}
-                      <Ellipsis />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Collapsible Content */}
-                {isOpen && !isReviewed && (
-                  <div className="p-4 border-t rounded-xl bg-gray-50 text-sm text-gray-700 animate-fadeIn">
-                    {(() => {
-                      const v = field.value;
-
-                      // Case 1: Array of objects or primitives
-                      if (Array.isArray(v)) {
-                        if (v.length === 0) {
-                          return (
-                            <span className="text-gray-500 italic">
-                              Empty Array
-                            </span>
-                          );
-                        }
-
-                        // Check if array contains objects
-                        const isArrayOfObjects = v.every(
-                          (item) => typeof item === "object" && item !== null
-                        );
-
-                        if (isArrayOfObjects) {
-                          // Render as list of cards
-                          return (
-                            <div className="space-y-3">
-                              {v.map((obj, idx) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm"
-                                >
-                                  {Object.entries(obj).map(([k, val]) => (
-                                    <div
-                                      key={k}
-                                      className="flex items-start gap-2 text-sm"
-                                    >
-                                      <span className="font-medium text-gray-700 min-w-28 capitalize">
-                                        {k.replace(/_/g, " ")}:
-                                      </span>
-                                      <span className="text-gray-800">
-                                        {Array.isArray(val) ? (
-                                          <ul className="list-disc pl-5 space-y-0.5">
-                                            {val.map((item, i) => (
-                                              <li key={i}>
-                                                {item?.toString?.() ?? "—"}
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        ) : typeof val === "object" &&
-                                          val !== null ? (
-                                          <pre className="whitespace-pre-wrap text-gray-800 bg-gray-50 rounded-lg p-1">
-                                            {JSON.stringify(val, null, 2)}
-                                          </pre>
-                                        ) : (
-                                          val?.toString?.() ?? "—"
-                                        )}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        } else {
-                          // Render array of primitive values
-                          return (
-                            <div className="flex flex-wrap gap-2">
-                              {v.map((item, i) => (
-                                <span
-                                  key={i}
-                                  className="px-3 py-1 bg-white border border-gray-300 rounded-full text-gray-800 text-sm"
-                                >
-                                  {item?.toString?.() ?? "—"}
-                                </span>
-                              ))}
-                            </div>
-                          );
-                        }
-                      }
-
-                      // Case 2: Object (non-array)
-                      if (typeof v === "object" && v !== null) {
-                        return (
-                          <pre className="whitespace-pre-wrap bg-white border border-gray-200 rounded-lg p-3 text-gray-800 overflow-x-auto">
-                            {JSON.stringify(v, null, 2)}
+      if (isArrayOfObjects) {
+        return (
+          <div className="space-y-3">
+            {value.map((obj, idx) => (
+              <Card key={idx} className="border-muted">
+                <CardContent className="pt-4">
+                  {Object.entries(obj).map(([k, val]) => (
+                    <div key={k} className="flex items-start gap-3 text-sm mb-3 last:mb-0">
+                      <span className="font-medium text-foreground min-w-32 capitalize">
+                        {k.replace(/_/g, " ")}:
+                      </span>
+                      <span className="text-muted-foreground flex-1">
+                        {Array.isArray(val) ? (
+                          <ul className="list-disc pl-5 space-y-1">
+                            {val.map((item, i) => (
+                              <li key={i}>{item?.toString?.() ?? "—"}</li>
+                            ))}
+                          </ul>
+                        ) : typeof val === "object" && val !== null ? (
+                          <pre className="whitespace-pre-wrap text-xs bg-muted border rounded p-2 overflow-x-auto">
+                            {JSON.stringify(val, null, 2)}
                           </pre>
-                        );
-                      }
+                        ) : (
+                          val?.toString?.() ?? "—"
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        );
+      } else {
+        return (
+          <div className="flex flex-wrap gap-2">
+            {value.map((item, i) => (
+              <Badge key={i} variant="secondary">
+                {item?.toString?.() ?? "—"}
+              </Badge>
+            ))}
+          </div>
+        );
+      }
+    }
 
-                      // Case 3: Primitives (string, number, boolean, null)
-                      return (
-                        <pre className="whitespace-pre-wrap">
-                          {v?.toString?.() ?? "—"}
-                        </pre>
-                      );
-                    })()}
+    // Case 2: Object (non-array)
+    if (typeof value === "object" && value !== null) {
+      return (
+        <pre className="whitespace-pre-wrap text-sm bg-muted border rounded-lg p-4 overflow-x-auto max-h-96">
+          {JSON.stringify(value, null, 2)}
+        </pre>
+      );
+    }
+
+    // Case 3: Primitives (string, number, boolean, null)
+    if (typeof value === "string" && value.length > 200) {
+      return (
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+          {value}
+        </p>
+      );
+    }
+
+    return (
+      <p className="text-sm font-medium">
+        {value?.toString?.() ?? "—"}
+      </p>
+    );
+  };
+
+  return (
+    <div className="w-full h-full overflow-y-auto">
+      <div className="max-w-4xl mx-auto p-4 space-y-3">
+        {fieldsToReview.map((field, index) => {
+          const isReviewed = reviewed.includes(field.key);
+          const isCurrent = currentFieldIndex === index;
+
+          return (
+            <Card
+              key={field.key}
+              ref={(el) => (fieldRefs.current[field.key] = el)}
+              className={cn(
+                "transition-all duration-200 border",
+                isReviewed && "opacity-50 bg-green-50/50 border-green-200",
+                isCurrent && !isReviewed && "border-foreground shadow-sm",
+                !isCurrent && !isReviewed && "border-border"
+              )}
+            >
+              {/* Header with Approve Button */}
+              <CardHeader className="pb-3 px-4 pt-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      {field.label}
+                      {isCurrent && !isReviewed && (
+                        <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
+                          Current
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    {isReviewed && (
+                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Approved
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <Button
+                    onClick={() => approveField(field.key)}
+                    variant={isReviewed ? "outline" : "default"}
+                    size="sm"
+                    className={cn(
+                      "flex-shrink-0 gap-1.5 h-8 text-xs",
+                      isReviewed && "border-green-500 text-green-700 hover:bg-green-50"
+                    )}
+                  >
+                    {isReviewed ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Approved
+                      </>
+                    ) : (
+                      <>
+                        <Circle className="w-3.5 h-3.5" />
+                        Approve
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+
+              {/* Field Value */}
+              <CardContent className="px-4 pb-4">
+                {renderFieldValue(field.value)}
+              </CardContent>
+            </Card>
+          );
+        })}
+
+        {/* Empty State */}
+        {fieldsToReview.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-12">
+              <p className="text-muted-foreground text-sm">
+                No fields to review
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
 }
-
-/** ============================== VARIATION - 3 ============================ */
-// import { useRef, useMemo } from "react";
-// import { CheckCircle2, Circle, ChevronDown, ChevronUp } from "lucide-react";
-
-// export default function ReviewApprovalUI({
-//   reviewed,
-//   fieldsToReview,
-//   setExpanded,
-//   setReviewed,
-//   expanded,
-// }) {
-//   const fieldRefs = useRef({});
-
-//   // Reorder: Unreviewed on top, Reviewed at bottom
-//   const sortedFields = useMemo(() => {
-//     return [
-//       ...fieldsToReview.filter((f) => !reviewed.includes(f.key)),
-//       ...fieldsToReview.filter((f) => reviewed.includes(f.key)),
-//     ];
-//   }, [fieldsToReview, reviewed]);
-
-//   // Toggle expand/collapse
-//   const toggleExpand = (key) => {
-//     setExpanded((prev) =>
-//       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-//     );
-//   };
-
-//   // Toggle reviewed state + auto-scroll + reorder
-//   const toggleReview = (key) => {
-//     setReviewed((prev) => {
-//       const updated = prev.includes(key)
-//         ? prev.filter((k) => k !== key)
-//         : [...prev, key];
-
-//       // Collapse if newly reviewed
-//       if (!prev.includes(key)) {
-//         setExpanded((exp) => exp.filter((k) => k !== key));
-
-//         // Scroll to next unreviewed
-//         const currentIndex = fieldsToReview.findIndex((f) => f.key === key);
-//         const nextField = fieldsToReview
-//           .slice(currentIndex + 1)
-//           .find((f) => !prev.includes(f.key));
-
-//         if (nextField && fieldRefs.current[nextField.key]) {
-//           setTimeout(() => {
-//             fieldRefs.current[nextField.key].scrollIntoView({
-//               behavior: "smooth",
-//               block: "center",
-//             });
-//           }, 300);
-//         }
-//       }
-
-//       return updated;
-//     });
-//   };
-
-//   return (
-//     <div className="w-full min-h-screen bg-gray-50 overflow-y-auto">
-//       <div className="max-w-full min-h-screen mx-auto bg-white p-6 space-y-6 border border-gray-200">
-//         <div className="space-y-4">
-//           {sortedFields.map((field) => {
-//             const isOpen = expanded.includes(field.key);
-//             const isReviewed = reviewed.includes(field.key);
-
-//             return (
-//               <div
-//                 key={field.key}
-//                 ref={(el) => (fieldRefs.current[field.key] = el)}
-//                 className={`border rounded-xl bg-white shadow-sm transition-all duration-200 ${
-//                   isReviewed
-//                     ? "opacity-60 cursor-not-allowed"
-//                     : "hover:shadow-md"
-//                 }`}
-//               >
-//                 {/* Header Row */}
-//                 <div
-//                   className={`flex items-center justify-between p-4 ${
-//                     isReviewed ? "cursor-not-allowed" : "cursor-pointer"
-//                   }`}
-//                   onClick={() => {
-//                     if (!isReviewed) toggleExpand(field.key);
-//                   }}
-//                 >
-//                   <h3 className="font-medium text-gray-700">{field.label}</h3>
-
-//                   {/* Actions */}
-//                   <div className="flex items-center gap-3">
-//                     <button
-//                       onClick={(e) => {
-//                         e.stopPropagation();
-//                         toggleReview(field.key);
-//                       }}
-//                       className={`transition ${
-//                         isReviewed
-//                           ? "text-green-500"
-//                           : "text-gray-500 hover:text-green-500"
-//                       }`}
-//                     >
-//                       {isReviewed ? (
-//                         <CheckCircle2 className="w-6 h-6" />
-//                       ) : (
-//                         <Circle className="w-6 h-6" />
-//                       )}
-//                     </button>
-
-//                     {!isReviewed &&
-//                       (isOpen ? (
-//                         <ChevronUp className="text-gray-500 transition-transform duration-300" />
-//                       ) : (
-//                         <ChevronDown className="text-gray-500 transition-transform duration-300" />
-//                       ))}
-//                   </div>
-//                 </div>
-
-//                 {/* Collapsible Content */}
-//                 {isOpen && !isReviewed && (
-//                   <div className="p-4 border-t bg-gray-50 text-sm text-gray-700 animate-fadeIn">
-//                     {field.value}
-//                   </div>
-//                 )}
-//               </div>
-//             );
-//           })}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }

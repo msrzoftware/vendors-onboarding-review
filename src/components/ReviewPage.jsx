@@ -1,42 +1,134 @@
 import ReviewApprovalUI from "./ReviewApprovalUI";
 import { useMemo, useState } from "react";
-import productData from "../data/product.json";
-import { pendingProducts } from "../data/product.json";
+import { useLocation, useNavigate } from "react-router-dom";
+import useProductDetail from "../hooks/use-product-detail";
+import useKeyboardShortcuts from "../hooks/use-keyboard-shortcuts";
+import { ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const ReviewPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [reviewed, setReviewed] = useState([]);
-  const [expanded, setExpanded] = useState([]);
+  const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
 
-  // ✅ Access the fieldsToReview object (make sure there’s no trailing space in JSON key)
-  const currentProduct = productData.fieldsToReview;
+  // Get product from location state
+  const productFromState = location.state;
+  const slug = productFromState?.product_slug;
 
-  // ✅ Convert the JSON object into an array of key-value pairs for rendering
-  const fieldsToReview = currentProduct
-    ? Object.entries(currentProduct).map(([key, value]) => {
-        let displayValue;
+  // Fetch full product details by slug
+  const { product, isLoading, error } = useProductDetail(slug);
 
-        if (value === null || value === undefined) {
-          displayValue = "—"; // graceful null/undefined
-        } else if (Array.isArray(value)) {
-          displayValue = value; // keep as array
-        } else if (typeof value === "object") {
-          displayValue = JSON.stringify(value, null, 2); // pretty-print object
-        } else if (typeof value === "boolean") {
-          displayValue = value ? "True" : "False"; // readable boolean
+  // Use fetched product, fallback to state if not yet loaded
+  const currentProduct = product || productFromState;
+
+  // ✅ Helper to check if value is empty
+  const isEmpty = (value) => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === "string" && value.trim() === "") return true;
+    if (Array.isArray(value) && value.length === 0) return true;
+    if (typeof value === "object" && Object.keys(value).length === 0) return true;
+    return false;
+  };
+
+  // ✅ Flatten nested objects for review
+  const flattenObject = (obj, parentKey = "") => {
+    const fields = [];
+
+    Object.entries(obj).forEach(([key, value]) => {
+      const fullKey = parentKey ? `${parentKey}.${key}` : key;
+
+      // Skip if value is empty/null/undefined
+      if (isEmpty(value)) {
+        return;
+      }
+
+      // Handle arrays
+      if (Array.isArray(value)) {
+        // Check if array of objects
+        const isArrayOfObjects = value.every(
+          (item) => typeof item === "object" && item !== null && !Array.isArray(item)
+        );
+
+        if (isArrayOfObjects && value.length > 0) {
+          // Create individual fields for each object in the array
+          value.forEach((item, index) => {
+            const itemKey = `${fullKey}[${index}]`;
+            const itemLabel = `${fullKey
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase())} #${index + 1}`;
+
+            // Flatten each object in the array
+            Object.entries(item).forEach(([subKey, subValue]) => {
+              if (isEmpty(subValue)) return;
+
+              const subFullKey = `${itemKey}.${subKey}`;
+              const subLabel = `${itemLabel} > ${subKey
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())}`;
+
+              // Handle nested arrays within array items
+              if (Array.isArray(subValue)) {
+                fields.push({
+                  key: subFullKey,
+                  label: subLabel,
+                  value: subValue,
+                });
+              } else if (typeof subValue === "object" && subValue !== null) {
+                // Flatten nested objects within array items
+                fields.push(...flattenObject(subValue, subFullKey));
+              } else {
+                fields.push({
+                  key: subFullKey,
+                  label: subLabel,
+                  value: typeof subValue === "boolean" ? (subValue ? "True" : "False") : subValue,
+                });
+              }
+            });
+          });
         } else {
-          displayValue = value; // number or string
+          // Array of primitives
+          fields.push({
+            key: fullKey,
+            label: fullKey
+              .replace(/_/g, " ")
+              .replace(/\./g, " > ")
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
+            value: value,
+          });
         }
+        return;
+      }
 
-        return {
-          key,
-          label: key
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase()),
-          value: displayValue,
-        };
-      })
-    : [];
+      // Handle objects - always flatten
+      if (typeof value === "object") {
+        fields.push(...flattenObject(value, fullKey));
+        return;
+      }
 
+      // Handle primitives
+      fields.push({
+        key: fullKey,
+        label: fullKey
+          .replace(/_/g, " ")
+          .replace(/\./g, " > ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
+        value: typeof value === "boolean" ? (value ? "True" : "False") : value,
+      });
+    });
+
+    return fields;
+  };
+
+  // ✅ Convert the product snapshot into an array of key-value pairs for rendering
+  const fieldsToReview = useMemo(() => {
+    if (!currentProduct?.snapshot) return [];
+    return flattenObject(currentProduct.snapshot);
+  }, [currentProduct]);
+
+  console.log("currentProduct", currentProduct);
   console.log("fieldsToReview", fieldsToReview);
 
   // ✅ Compute progress
@@ -45,118 +137,305 @@ const ReviewPage = () => {
     return Math.round((reviewed.length / fieldsToReview.length) * 100);
   }, [reviewed, fieldsToReview.length]);
 
+  // Get approved fields for the sheet
+  const approvedFields = useMemo(() => {
+    return fieldsToReview.filter((field) => reviewed.includes(field.key));
+  }, [fieldsToReview, reviewed]);
+
+  // Keyboard shortcuts
+  const handleApprove = () => {
+    if (currentFieldIndex !== null && fieldsToReview[currentFieldIndex]) {
+      const currentField = fieldsToReview[currentFieldIndex];
+      const isAlreadyReviewed = reviewed.includes(currentField.key);
+
+      if (!isAlreadyReviewed) {
+        setReviewed((prev) => [...prev, currentField.key]);
+
+        // Move to next unreviewed field
+        const nextField = fieldsToReview
+          .slice(currentFieldIndex + 1)
+          .find((f) => !reviewed.includes(f.key));
+
+        if (nextField) {
+          const nextIndex = fieldsToReview.findIndex((f) => f.key === nextField.key);
+          setCurrentFieldIndex(nextIndex);
+        }
+      }
+    }
+  };
+
+  const handleNext = () => {
+    if (currentFieldIndex < fieldsToReview.length - 1) {
+      setCurrentFieldIndex(currentFieldIndex + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentFieldIndex > 0) {
+      setCurrentFieldIndex(currentFieldIndex - 1);
+    }
+  };
+
+  // Use keyboard shortcuts
+  useKeyboardShortcuts({
+    onApprove: handleApprove,
+    onNext: handleNext,
+    onPrevious: handlePrevious,
+    enabled: !isLoading && fieldsToReview.length > 0,
+  });
+
+  // Handle sidebar field click
+  const handleFieldClick = (index) => {
+    setCurrentFieldIndex(index);
+  };
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            Error Loading Product
+          </h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => navigate("/")}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition"
+          >
+            Back to Products
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No product selected
+  if (!currentProduct && !isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            No Product Selected
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Please select a product from the list to review
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition"
+          >
+            Back to Products
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <aside className="w-[28%] bg-white shadow-lg hidden md:flex flex-col max-h-screen">
-        <div className="flex items-center gap-2 py-3 px-4 bg-slate-50 border-b border-gray-200">
-          <img
-            src={currentProduct?.logo_url}
-            alt={currentProduct?.product_name}
-            className="w-16 h-16 rounded-xl object-cover"
-          />
-          <div>
-            <h2 className="text-xl font-semibold text-gray-800">
-              {currentProduct?.product_name || "Unnamed Product"}
+      <aside className="w-60 bg-background border-r hidden md:flex flex-col h-screen">
+        {/* Product Header */}
+        <div className="flex items-center gap-2 py-3 px-3 border-b flex-shrink-0">
+          <div className="w-8 h-8 flex-shrink-0">
+            <img
+              src={currentProduct?.logo_url}
+              alt={currentProduct?.product_name}
+              className="w-full h-full rounded object-cover"
+              onError={(e) => {
+                e.target.src =
+                  "https://via.placeholder.com/32?text=" +
+                  (currentProduct?.product_name?.[0] || "P");
+              }}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold truncate">
+              {currentProduct?.product_name || "Product"}
             </h2>
-            <p className="text-gray-600 text-sm">
-              {currentProduct?.company || "Company"}
+            <p className="text-xs text-muted-foreground truncate">
+              {currentProduct?.company_name || "Company"}
             </p>
-            <span className="text-yellow-600 text-sm font-medium">
-              {currentProduct?.subscription_plan || "Basic"}
+          </div>
+        </div>
+
+        {/* Scrollable Sidebar Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Pending Fields Section */}
+          <div className="p-2">
+            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+              Pending ({fieldsToReview.length - reviewed.length})
+            </h3>
+            <nav className="flex flex-col space-y-0.5">
+              {fieldsToReview.map((field, index) => {
+                const isReviewed = reviewed.includes(field.key);
+                const isCurrent = currentFieldIndex === index;
+
+                if (isReviewed) return null;
+
+                return (
+                  <button
+                    key={field.key}
+                    onClick={() => handleFieldClick(index)}
+                    className={cn(
+                      "px-2 py-1.5 rounded transition-all text-left w-full text-xs",
+                      isCurrent ? "bg-foreground text-background font-medium" : "hover:bg-muted/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                          isCurrent ? "bg-background" : "bg-muted-foreground/40"
+                        )}
+                      />
+                      <p className="truncate">
+                        {field.label}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Approved Fields Section */}
+          {approvedFields.length > 0 && (
+            <>
+              <div className="h-px bg-border my-2" />
+              <div className="p-2">
+                <h3 className="text-[10px] font-semibold text-green-600 uppercase tracking-wider mb-2 px-2 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Approved ({approvedFields.length})
+                </h3>
+                <nav className="flex flex-col space-y-0.5">
+                  {approvedFields.map((field) => {
+                    const index = fieldsToReview.findIndex(f => f.key === field.key);
+                    return (
+                      <button
+                        key={field.key}
+                        onClick={() => handleFieldClick(index)}
+                        className="px-2 py-1.5 rounded transition-all text-left w-full text-xs bg-green-50 hover:bg-green-100"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-3 h-3 text-green-600 flex-shrink-0" />
+                          <p className="text-green-900 truncate">
+                            {field.label}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+            </>
+          )}
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col overflow-hidden h-screen">
+        {/* Header with Back Button and Title */}
+        <div className="border-b px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => navigate("/")}
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="Back to Products"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-sm font-semibold">
+              Review Fields
+            </h1>
+          </div>
+          <Badge variant="outline" className="text-xs font-normal">
+            {reviewed.length} / {fieldsToReview.length}
+          </Badge>
+        </div>
+
+        {/* Progress Section */}
+        <div className="border-b px-4 py-2 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-muted h-1 rounded-full overflow-hidden">
+              <div
+                className="h-full transition-all duration-300 bg-green-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap min-w-[3ch]">
+              {progress}%
             </span>
           </div>
         </div>
 
-        {/* Sidebar Navigation */}
-        <nav className="flex flex-col overflow-y-auto">
-          {fieldsToReview.map((field) => {
-            const isReviewed = reviewed.includes(field.key); // ✅ check if reviewed
-            const isCurrent = expanded.includes(field.key); // ✅ check if this field is currently expanded (active)
-            return (
-              <button
-                key={field.key}
-                className={`text-gray-700 font-medium text-left border-b border-gray-200/60 px-5 py-3 transition-all duration-200
-                  hover:text-indigo-600 hover:bg-indigo-50
-                  ${
-                    isCurrent
-                      ? "bg-yellow-100 text-yellow-800" // ✅ active field being reviewed
-                      : isReviewed
-                      ? "bg-green-100 text-green-800" // ✅ reviewed/approved fields
-                      : "bg-gray-50"
-                  }`}
-              >
-                {field.label}
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+              <p className="text-gray-600">Loading product details...</p>
+            </div>
+          </div>
+        )}
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className=" flex flex-col border-b border-gray-200">
-          <div className="bg-white left-0 z-10 w-full min-h-[100px] flex items-center text-gray-700 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] shadow-sm">
-            {pendingProducts.map((item, index) => (
-              <div
-                key={index}
-                className={`min-w-[180px] ${
-                  index === 0
-                    ? "bg-yellow-100 border-b-4 border-yellow-500"
-                    : ""
-                } h-full px-4 py-2 flex flex-col items-center justify-center border-r border-gray-200 hover:bg-blue-50 transition-all duration-200 cursor-pointer`}
-                // onClick={() => setCurrentIndex(index)}
-              >
-                <img
-                  src={item.logo}
-                  alt={item.name}
-                  className="w-10 h-10 object-contain rounded-md"
-                />
-                <div className="font-semibold text-sm mt-2">{item.name}</div>
-                <div className="text-xs text-gray-500">{item.company}</div>
-                <span className="mt-1 text-[11px] bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">
-                  Pending Review
-                </span>
+        {/* Fields Review Container */}
+        {!isLoading && (
+          <div className="flex-1 overflow-y-auto relative">
+            <ReviewApprovalUI
+              reviewed={reviewed}
+              setReviewed={setReviewed}
+              fieldsToReview={fieldsToReview}
+              currentFieldIndex={currentFieldIndex}
+              setCurrentFieldIndex={setCurrentFieldIndex}
+            />
+
+            {/* Floating Keyboard Shortcuts Hints */}
+            {fieldsToReview.length > 0 && (
+              <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
+                {/* Approve Shortcut */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium">Approve</span>
+                  <kbd className="px-3 py-2 text-sm border rounded-md shadow-sm bg-background font-mono font-semibold">
+                    Space
+                  </kbd>
+                </div>
+
+                {/* Next Shortcut */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium">Next</span>
+                  <div className="flex gap-1.5 items-center">
+                    <kbd className="px-3 py-2 text-sm border rounded-md shadow-sm bg-background font-mono font-semibold">
+                      J
+                    </kbd>
+                    <span className="text-[10px]">or</span>
+                    <kbd className="px-3 py-2 text-sm border rounded-md shadow-sm bg-background font-mono font-semibold">
+                      ↓
+                    </kbd>
+                  </div>
+                </div>
+
+                {/* Previous Shortcut */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium">Previous</span>
+                  <div className="flex gap-1.5 items-center">
+                    <kbd className="px-3 py-2 text-sm border rounded-md shadow-sm bg-background font-mono font-semibold">
+                      K
+                    </kbd>
+                    <span className="text-[10px]">or</span>
+                    <kbd className="px-3 py-2 text-sm border rounded-md shadow-sm bg-background font-mono font-semibold">
+                      ↑
+                    </kbd>
+                  </div>
+                </div>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-
-        {/* Cards Section */}
-        <div className="overflow-auto relative">
-          <div className="sticky top-0 left-0 flex items-center justify-between min-h-[87.99px] px-8 bg-white z-10 border-b border-gray-200">
-            {/* Progress Bar */}
-            <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${
-                  progress === 100 ? "bg-green-500" : "bg-indigo-500"
-                } transition-all`}
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500 flex items-center gap-2 ml-4 text-nowrap">
-                {reviewed.length}/{fieldsToReview.length} Reviewed
-              </span>
-            </div>
-          </div>
-          <ReviewApprovalUI
-            reviewed={reviewed}
-            expanded={expanded}
-            setExpanded={setExpanded}
-            setReviewed={setReviewed}
-            fieldsToReview={fieldsToReview}
-          />
-        </div>
-        {/* <footer className="h-20 bg-white flex items-center justify-end gap-4 px-6 shadow-inner border-t border-gray-200">
-          <button className="bg-blue-600 text-white min-w-[150px] h-12 rounded-lg hover:bg-blue-700 transition">
-            Prev
-          </button>
-          <button className="bg-blue-600 text-white min-w-[150px] h-12 rounded-lg hover:bg-blue-700 transition">
-            Next
-          </button>
-        </footer> */}
+        )}
       </main>
     </div>
   );
