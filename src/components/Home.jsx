@@ -1,7 +1,19 @@
-import { Search, ArrowRight, AlertCircle } from "lucide-react";
+import { Search, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import useProducts from "../hooks/use-products";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -11,150 +23,214 @@ export const Home = () => {
     isLoading,
     error,
     goToNextPage,
-    goToPreviousPage,
   } = useProducts(12);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [commandMenuOpen, setCommandMenuOpen] = useState(false);
+  const [allProducts, setAllProducts] = useState([]);
+  const loadMoreRef = useRef(null);
 
-  // Filter products based on search query
-  const filteredProducts = products.filter((product) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      product.product_name.toLowerCase().includes(query) ||
-      product.company_name.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query)
+  // Accumulate all products as we load more pages
+  useEffect(() => {
+    if (products.length > 0) {
+      setAllProducts((prev) => {
+        // If we're on page 1, replace all products
+        if (pagination.currentPage === 1) {
+          return products;
+        }
+        // Otherwise, append new products (avoiding duplicates)
+        const existingIds = new Set(prev.map((p) => p._id));
+        const newProducts = products.filter((p) => !existingIds.has(p._id));
+        return [...prev, ...newProducts];
+      });
+    }
+  }, [products, pagination.currentPage]);
+
+  // Command menu keyboard shortcut (Cmd+K or Ctrl+K)
+  useEffect(() => {
+    const down = (e) => {
+      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || e.key === "/") {
+        e.preventDefault();
+        setCommandMenuOpen((open) => !open);
+      }
+    };
+
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && pagination.hasNextPage && !isLoading) {
+          goToNextPage();
+        }
+      },
+      { threshold: 0.1 }
     );
-  });
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [pagination.hasNextPage, isLoading, goToNextPage]);
 
   const handleProductClick = (product) => {
     navigate("/review", { state: product });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
+      {/* Command Menu */}
+      <CommandDialog open={commandMenuOpen} onOpenChange={setCommandMenuOpen}>
+        <CommandInput placeholder="Search products..." />
+        <CommandList>
+          <CommandEmpty>No products found.</CommandEmpty>
+          <CommandGroup heading="Products">
+            {allProducts.map((product) => (
+              <CommandItem
+                key={product._id}
+                onSelect={() => {
+                  handleProductClick(product);
+                  setCommandMenuOpen(false);
+                }}
+                className="flex items-center justify-between py-3"
+              >
+                <div className="flex-1">
+                  <div className="font-medium">{product.product_name}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {product.company_name}
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
+
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-800">
+            <h1 className="text-2xl font-semibold text-foreground">
               Pending Product Reviews
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Total Products: {pagination.totalItems}
             </p>
           </div>
-          <div className="relative">
-            <Search
-              className="absolute left-3 top-2.5 text-gray-400"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 w-64 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            />
-          </div>
+          <Button
+            onClick={() => setCommandMenuOpen(true)}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <Search size={16} />
+            <span>Search</span>
+            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <span className="text-xs">⌘</span>K
+            </kbd>
+          </Button>
         </div>
 
-        {/* Loading State */}
-        {isLoading && (
+        {/* Initial Loading State */}
+        {isLoading && pagination.currentPage === 1 && allProducts.length === 0 && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-              <p className="text-gray-600 mt-4">Loading products...</p>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <p className="text-muted-foreground mt-4">Loading products...</p>
             </div>
           </div>
         )}
 
         {/* Error State */}
         {error && !isLoading && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3 mb-6">
-            <AlertCircle className="text-red-600" size={20} />
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-center gap-3 mb-6">
+            <AlertCircle className="text-destructive" size={20} />
             <div>
-              <p className="font-semibold text-red-800">
+              <p className="font-semibold text-destructive">
                 Error loading products
               </p>
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-destructive/90">{error}</p>
             </div>
           </div>
         )}
 
         {/* Empty State */}
-        {!isLoading && !error && filteredProducts.length === 0 && (
+        {!isLoading && !error && allProducts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">
-              {searchQuery
-                ? "No products match your search"
-                : "No products available"}
+            <p className="text-muted-foreground text-lg">
+              No products available
             </p>
           </div>
         )}
 
         {/* Product Cards */}
-        {!isLoading && !error && filteredProducts.length > 0 && (
+        {!error && allProducts.length > 0 && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {filteredProducts.map((product) => (
-                <div
+              {allProducts.map((product) => (
+                <Card
                   key={product._id}
-                  className="bg-white rounded-2xl shadow-md hover:shadow-lg transition p-5 flex flex-col"
+                  className="border shadow-none hover:border-primary/50 transition-colors cursor-pointer flex flex-col"
+                  onClick={() => handleProductClick(product)}
                 >
-                  <div className="mb-3">
-                    <h2 className="font-semibold text-gray-800">
-                      {product.product_name}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      {product.company_name}
+                  <CardContent className="p-5 flex flex-col flex-1">
+                    <div className="mb-3">
+                      <h2 className="font-semibold text-foreground">
+                        {product.product_name}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {product.company_name}
+                      </p>
+                    </div>
+
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                      {product.description}
                     </p>
-                  </div>
 
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                    {product.description}
-                  </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {product.industry?.slice(0, 2).map((ind, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">
+                          {ind}
+                        </Badge>
+                      ))}
+                    </div>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {product.industry?.slice(0, 2).map((ind, i) => (
-                      <span
-                        key={i}
-                        className="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full"
-                      >
-                        {ind}
-                      </span>
-                    ))}
-                  </div>
-
-                  <button
-                    className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-xl flex items-center justify-center gap-2 transition"
-                    onClick={() => handleProductClick(product)}
-                  >
-                    Review Product <ArrowRight size={16} />
-                  </button>
-                </div>
+                    <Button
+                      className="mt-auto w-full gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleProductClick(product);
+                      }}
+                    >
+                      Review Product <ArrowRight size={16} />
+                    </Button>
+                  </CardContent>
+                </Card>
               ))}
             </div>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between mt-8">
-              <div className="text-sm text-gray-600">
-                Page {pagination.currentPage} of {pagination.totalPages}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  disabled={!pagination.hasPreviousPage}
-                  onClick={goToPreviousPage}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  Previous
-                </button>
-                <button
-                  disabled={!pagination.hasNextPage}
-                  onClick={goToNextPage}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  Next
-                </button>
-              </div>
+            {/* Load More Trigger */}
+            <div ref={loadMoreRef} className="flex justify-center py-8">
+              {isLoading && pagination.currentPage > 1 && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Loading more products...</span>
+                </div>
+              )}
+              {!isLoading && !pagination.hasNextPage && allProducts.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  All products loaded ({allProducts.length} total)
+                </p>
+              )}
             </div>
           </>
         )}

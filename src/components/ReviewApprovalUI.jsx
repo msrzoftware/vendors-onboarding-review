@@ -1,9 +1,20 @@
 import { useRef, useEffect, useState, useMemo } from "react";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, BadgeCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ReviewCard,
+  ReviewCardContent,
+  ReviewCardHeader,
+  ReviewCardTitle,
+} from "@/components/ui/review-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
 export default function ReviewApprovalUI({
@@ -16,13 +27,14 @@ export default function ReviewApprovalUI({
 }) {
   const fieldRefs = useRef({});
 
-  // Scroll to current field when index changes
+  // Scroll to current field when index changes - using "start" to avoid jump issues
   useEffect(() => {
     if (currentFieldIndex !== null && fieldsToReview[currentFieldIndex]) {
       const field = fieldsToReview[currentFieldIndex];
       const element = fieldRefs.current[field.key];
 
       if (element) {
+        // Use "start" alignment so collapsing sections above don't affect scroll position
         element.scrollIntoView({
           behavior: "smooth",
           block: "center",
@@ -46,7 +58,9 @@ export default function ReviewApprovalUI({
           .find((f) => !updated.includes(f.key));
 
         if (nextField) {
-          const nextIndex = fieldsToReview.findIndex((f) => f.key === nextField.key);
+          const nextIndex = fieldsToReview.findIndex(
+            (f) => f.key === nextField.key
+          );
           setCurrentFieldIndex(nextIndex);
         }
       }
@@ -58,15 +72,18 @@ export default function ReviewApprovalUI({
   // Render field value based on type
   const renderFieldValue = (value, fieldKey) => {
     // Special handling for review strengths and weaknesses - show as bullet points
-    const isReviewStrengthsOrWeakness = fieldKey?.includes('review_strengths') ||
-                                        fieldKey?.includes('reviews_strengths') ||
-                                        fieldKey?.includes('reviews_weakness') ||
-                                        fieldKey?.includes('review_weakness');
+    const isReviewStrengthsOrWeakness =
+      fieldKey?.includes("review_strengths") ||
+      fieldKey?.includes("reviews_strengths") ||
+      fieldKey?.includes("reviews_weakness") ||
+      fieldKey?.includes("review_weakness");
 
     // Case 1: Array of objects
     if (Array.isArray(value)) {
       if (value.length === 0) {
-        return <span className="text-muted-foreground italic">Empty Array</span>;
+        return (
+          <span className="text-muted-foreground italic">Empty Array</span>
+        );
       }
 
       const isArrayOfObjects = value.every(
@@ -74,19 +91,32 @@ export default function ReviewApprovalUI({
       );
 
       if (isArrayOfObjects) {
-        // Special rendering for pricing plans
-        const isPricingPlans = fieldKey?.includes('pricing_plans');
-        const isFeatures = fieldKey?.includes('features');
+        // Special rendering for pricing plans, features, social links, and options
+        const isPricingPlans = fieldKey?.includes("pricing_plans");
+        const isFeatures = fieldKey?.includes("features");
+        const isSocialLinks =
+          fieldKey?.includes("social_links") ||
+          fieldKey?.includes("social_profiles");
+        const isDeploymentOptions = fieldKey?.includes("deployment_options");
+        const isSupportOptions = fieldKey?.includes("support_options");
+        const isIntegrations = fieldKey?.includes("integrations");
 
         if (isPricingPlans) {
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {value.map((plan, idx) => (
-                <Card key={idx} className="border-2 shadow-none hover:border-primary/50 transition-colors">
+                <Card
+                  key={idx}
+                  className="border-2 shadow-none hover:border-primary/50 transition-colors"
+                >
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">{plan.plan || `Plan ${idx + 1}`}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {plan.plan || `Plan ${idx + 1}`}
+                    </CardTitle>
                     {plan.entity && (
-                      <p className="text-xs text-muted-foreground">{plan.entity}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {plan.entity}
+                      </p>
                     )}
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -97,17 +127,23 @@ export default function ReviewApprovalUI({
                           {plan.amount}
                         </span>
                         {plan.currency && (
-                          <span className="text-sm text-muted-foreground">{plan.currency}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {plan.currency}
+                          </span>
                         )}
                         {plan.period && (
-                          <span className="text-sm text-muted-foreground">/ {plan.period}</span>
+                          <span className="text-sm text-muted-foreground">
+                            / {plan.period}
+                          </span>
                         )}
                       </div>
                     )}
 
                     {/* Free badge */}
                     {plan.is_free && (
-                      <Badge variant="default" className="bg-green-600">Free</Badge>
+                      <Badge variant="default" className="bg-emerald-600">
+                        Free
+                      </Badge>
                     )}
 
                     {/* Description */}
@@ -115,8 +151,10 @@ export default function ReviewApprovalUI({
                       <ul className="space-y-2 text-sm">
                         {plan.description.map((item, i) => (
                           <li key={i} className="flex items-start gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                            <span className="text-muted-foreground">{item}</span>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                            <span className="text-muted-foreground">
+                              {item}
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -124,13 +162,27 @@ export default function ReviewApprovalUI({
 
                     {/* Other fields */}
                     {Object.entries(plan).map(([k, val]) => {
-                      if (['plan', 'entity', 'amount', 'currency', 'period', 'description', 'is_free'].includes(k)) {
+                      if (
+                        [
+                          "plan",
+                          "entity",
+                          "amount",
+                          "currency",
+                          "period",
+                          "description",
+                          "is_free",
+                        ].includes(k)
+                      ) {
                         return null;
                       }
                       return (
                         <div key={k} className="text-sm">
-                          <span className="font-medium capitalize">{k.replace(/_/g, " ")}: </span>
-                          <span className="text-muted-foreground">{val?.toString?.() ?? "—"}</span>
+                          <span className="font-medium capitalize">
+                            {k.replace(/_/g, " ")}:{" "}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {val?.toString?.() ?? "—"}
+                          </span>
                         </div>
                       );
                     })}
@@ -150,14 +202,78 @@ export default function ReviewApprovalUI({
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
-                        <h4 className="font-semibold text-sm mb-1">{feature.name}</h4>
+                        <h4 className="font-semibold text-sm mb-1">
+                          {feature.name}
+                        </h4>
                         {feature.description && (
-                          <p className="text-sm text-muted-foreground">{feature.description}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {feature.description}
+                          </p>
                         )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+              ))}
+            </div>
+          );
+        }
+
+        if (isSocialLinks) {
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {value.map((link, idx) => (
+                <div key={idx} className="border rounded-lg p-3 bg-card">
+                  <div className="space-y-1.5">
+                    <p className="font-semibold text-sm">{link.platform}</p>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground hover:text-primary hover:underline break-all leading-relaxed block"
+                    >
+                      {link.url}
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        if (isDeploymentOptions || isSupportOptions) {
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {value.map((option, idx) => (
+                <div key={idx} className="border rounded-lg p-2 bg-card">
+                  <p className="font-medium text-xs">
+                    {option.type || option.name}
+                  </p>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        if (isIntegrations) {
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {value.map((integration, idx) => (
+                <div key={idx} className="border rounded-lg p-2 bg-card">
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-xs">{integration.name}</p>
+                    {integration.website && (
+                      <a
+                        href={integration.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-muted-foreground hover:text-primary hover:underline break-all leading-tight block"
+                      >
+                        {integration.website}
+                      </a>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           );
@@ -172,7 +288,8 @@ export default function ReviewApprovalUI({
                   {Object.entries(obj)
                     .filter(([k, val]) => {
                       // Skip empty/null values
-                      if (val === null || val === undefined || val === "") return false;
+                      if (val === null || val === undefined || val === "")
+                        return false;
                       // Skip logo field if it's empty or just a dash
                       if (k === "logo" && (!val || val === "—")) return false;
                       return true;
@@ -187,7 +304,10 @@ export default function ReviewApprovalUI({
                       }
 
                       return (
-                        <div key={k} className="flex items-start gap-3 text-sm mb-3 last:mb-0">
+                        <div
+                          key={k}
+                          className="flex items-start gap-3 text-sm mb-3 last:mb-0"
+                        >
                           <span className="font-medium text-foreground min-w-32">
                             {label}:
                           </span>
@@ -221,7 +341,9 @@ export default function ReviewApprovalUI({
           return (
             <ul className="list-disc pl-5 space-y-1.5 text-sm">
               {value.map((item, i) => (
-                <li key={i} className="text-muted-foreground">{item?.toString?.() ?? "—"}</li>
+                <li key={i} className="text-muted-foreground">
+                  {item?.toString?.() ?? "—"}
+                </li>
               ))}
             </ul>
           );
@@ -252,8 +374,12 @@ export default function ReviewApprovalUI({
     // Case 3: Primitives (string, number, boolean, null)
     if (typeof value === "string") {
       // Check if this is HTML content (for software_analysis fields)
-      const isHTML = value.includes('<p>') || value.includes('<ul>') || value.includes('<li>') || value.includes('<strong>');
-      const isSoftwareAnalysis = fieldKey?.includes('software_analysis');
+      const isHTML =
+        value.includes("<p>") ||
+        value.includes("<ul>") ||
+        value.includes("<li>") ||
+        value.includes("<strong>");
+      const isSoftwareAnalysis = fieldKey?.includes("software_analysis");
 
       if (isHTML && isSoftwareAnalysis) {
         // Render HTML content
@@ -277,11 +403,7 @@ export default function ReviewApprovalUI({
       }
     }
 
-    return (
-      <p className="text-sm font-medium">
-        {value?.toString?.() ?? "—"}
-      </p>
-    );
+    return <p className="text-sm font-medium">{value?.toString?.() ?? "—"}</p>;
   };
 
   // Calculate section statistics
@@ -306,7 +428,8 @@ export default function ReviewApprovalUI({
 
   // Determine which sections should be open by default (sections with current field)
   const currentSection = useMemo(() => {
-    if (currentFieldIndex === null || !fieldsToReview[currentFieldIndex]) return null;
+    if (currentFieldIndex === null || !fieldsToReview[currentFieldIndex])
+      return null;
     const currentField = fieldsToReview[currentFieldIndex];
     const topLevelKey = currentField.key.split(/[\.\[]/)[0];
     return topLevelKey;
@@ -314,35 +437,35 @@ export default function ReviewApprovalUI({
 
   // Track which sections are open
   const [openSections, setOpenSections] = useState(() =>
-    groupedFields.map(section => section.key)
+    groupedFields.map((section) => section.key)
   );
 
   // Ensure current section is always open
   useEffect(() => {
     if (currentSection && !openSections.includes(currentSection)) {
-      setOpenSections(prev => [...prev, currentSection]);
+      setOpenSections((prev) => [...prev, currentSection]);
     }
   }, [currentSection]);
 
   // Update open sections when groupedFields changes (on initial load)
   useEffect(() => {
-    setOpenSections(groupedFields.map(section => section.key));
+    setOpenSections(groupedFields.map((section) => section.key));
   }, [groupedFields.length]);
 
   // Auto-collapse sections when all fields are approved
   useEffect(() => {
     const completedSections = groupedFields
-      .filter(section => {
-        const allFieldsReviewed = section.fields.every(field =>
+      .filter((section) => {
+        const allFieldsReviewed = section.fields.every((field) =>
           reviewed.includes(field.key)
         );
         return allFieldsReviewed && section.fields.length > 0;
       })
-      .map(section => section.key);
+      .map((section) => section.key);
 
     if (completedSections.length > 0) {
-      setOpenSections(prev =>
-        prev.filter(key => !completedSections.includes(key))
+      setOpenSections((prev) =>
+        prev.filter((key) => !completedSections.includes(key))
       );
     }
   }, [reviewed, groupedFields]);
@@ -353,31 +476,37 @@ export default function ReviewApprovalUI({
     const isCurrent = currentFieldIndex === index;
 
     return (
-      <Card
+      <ReviewCard
         key={field.key}
         ref={(el) => (fieldRefs.current[field.key] = el)}
+        onClick={() => setCurrentFieldIndex(index)}
         className={cn(
-          "transition-all duration-200 shadow-none",
-          isReviewed && "opacity-50 bg-green-50/50 border-green-200",
-          isCurrent && !isReviewed && "border-yellow-500 border-2 bg-yellow-50/30",
+          "transition-all duration-200 cursor-pointer",
+          isReviewed && "opacity-50 bg-emerald-50/50 border-emerald-200",
+          isCurrent &&
+            !isReviewed &&
+            "border-amber-500 border-2 bg-amber-50/30",
           !isCurrent && !isReviewed && "border-border"
         )}
       >
         {/* Header with Approve Button - only show if NOT the only field in section */}
         {!isOnlyFieldInSection && (
-          <CardHeader className="pb-2 px-3 pt-3">
+          <ReviewCardHeader>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <ReviewCardTitle className="text-sm flex items-center gap-2">
                   {field.label}
                   {isCurrent && !isReviewed && (
-                    <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
+                    <Badge
+                      variant="default"
+                      className="text-[10px] px-1.5 py-0 h-4"
+                    >
                       Current
                     </Badge>
                   )}
-                </CardTitle>
+                </ReviewCardTitle>
                 {isReviewed && (
-                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                  <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" />
                     Approved
                   </p>
@@ -388,8 +517,9 @@ export default function ReviewApprovalUI({
                 variant={isReviewed ? "outline" : "default"}
                 size="sm"
                 className={cn(
-                  "flex-shrink-0 gap-1.5 h-8 text-xs",
-                  isReviewed && "border-green-500 text-green-700 hover:bg-green-50"
+                  "flex-shrink-0 gap-1.5 h-7 text-xs",
+                  isReviewed &&
+                    "border-emerald-500 text-emerald-700 hover:bg-emerald-50"
                 )}
               >
                 {isReviewed ? (
@@ -405,19 +535,19 @@ export default function ReviewApprovalUI({
                 )}
               </Button>
             </div>
-          </CardHeader>
+          </ReviewCardHeader>
         )}
 
         {/* For single-field sections, show status badges at top */}
         {isOnlyFieldInSection && (
-          <div className="px-3 pt-3">
+          <div className="p-3 pb-2">
             {isCurrent && !isReviewed && (
               <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
                 Current
               </Badge>
             )}
             {isReviewed && (
-              <p className="text-xs text-green-600 flex items-center gap-1">
+              <p className="text-xs text-emerald-600 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
                 Approved
               </p>
@@ -426,9 +556,13 @@ export default function ReviewApprovalUI({
         )}
 
         {/* Field Value */}
-        <CardContent className={cn("px-3", isOnlyFieldInSection ? "pt-2 pb-3" : "pb-3")}>
+        <ReviewCardContent
+          className={
+            isOnlyFieldInSection && !isCurrent && !isReviewed ? "pt-3" : ""
+          }
+        >
           {renderFieldValue(field.value, field.key)}
-        </CardContent>
+        </ReviewCardContent>
 
         {/* For single-field sections, show approve button at bottom-right */}
         {isOnlyFieldInSection && (
@@ -438,8 +572,9 @@ export default function ReviewApprovalUI({
               variant={isReviewed ? "outline" : "default"}
               size="sm"
               className={cn(
-                "gap-1.5 h-8 text-xs",
-                isReviewed && "border-green-500 text-green-700 hover:bg-green-50"
+                "gap-1.5 h-7 text-xs",
+                isReviewed &&
+                  "border-emerald-500 text-emerald-700 hover:bg-emerald-50"
               )}
             >
               {isReviewed ? (
@@ -456,7 +591,7 @@ export default function ReviewApprovalUI({
             </Button>
           </div>
         )}
-      </Card>
+      </ReviewCard>
     );
   };
 
@@ -484,7 +619,7 @@ export default function ReviewApprovalUI({
                     value={section.key}
                     className={cn(
                       "hover:no-underline",
-                      isComplete && "bg-green-50/50"
+                      isComplete && "bg-emerald-50/50"
                     )}
                   >
                     <div className="flex items-center justify-between w-full pr-4">
@@ -493,13 +628,13 @@ export default function ReviewApprovalUI({
                       </h3>
                       <div className="flex items-center gap-3">
                         {isComplete && (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          <BadgeCheck className="w-5 h-5 text-emerald-600" />
                         )}
                         <Badge
                           variant={isComplete ? "default" : "secondary"}
                           className={cn(
                             "text-xs",
-                            isComplete && "bg-green-600 hover:bg-green-700"
+                            isComplete && "bg-emerald-600 hover:bg-emerald-700"
                           )}
                         >
                           {stats.reviewed} / {stats.total}
@@ -511,7 +646,9 @@ export default function ReviewApprovalUI({
                   <AccordionContent value={section.key}>
                     <div className="px-4 space-y-3">
                       {section.fields.map((field) => {
-                        const index = fieldsToReview.findIndex(f => f.key === field.key);
+                        const index = fieldsToReview.findIndex(
+                          (f) => f.key === field.key
+                        );
                         const isOnlyField = section.fields.length === 1;
                         return renderFieldCard(field, index, isOnlyField);
                       })}
