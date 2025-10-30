@@ -45,6 +45,18 @@ const ReviewPage = () => {
         return;
       }
 
+      // Skip duplicate fields that exist both inside nested objects and at root level
+      // We prefer the nested versions (e.g., pricing.overview over pricing_overview)
+      if (!parentKey && obj.pricing) {
+        // Check if root-level field is a duplicate of a nested pricing field
+        if (key === 'pricing_overview' && obj.pricing.overview) {
+          return; // Skip root pricing_overview if pricing.overview exists
+        }
+        if (key === 'pricing_details_web_url' && obj.pricing.pricing_url) {
+          return; // Skip root pricing_details_web_url if pricing.pricing_url exists
+        }
+      }
+
       // Handle arrays
       if (Array.isArray(value)) {
         // Check if array of objects
@@ -52,42 +64,65 @@ const ReviewPage = () => {
           (item) => typeof item === "object" && item !== null && !Array.isArray(item)
         );
 
+        // Special handling for arrays that should be kept together as cards
+        const keepAsWhole = [
+          'pricing_plans',
+          'features',
+          'integrations',
+          'deployment_options',
+          'support_options',
+          'social_links'
+        ];
+        const shouldKeepWhole = keepAsWhole.some(pattern => fullKey.includes(pattern));
+
         if (isArrayOfObjects && value.length > 0) {
-          // Create individual fields for each object in the array
-          value.forEach((item, index) => {
-            const itemKey = `${fullKey}[${index}]`;
-            const itemLabel = `${fullKey
-              .replace(/_/g, " ")
-              .replace(/\b\w/g, (c) => c.toUpperCase())} #${index + 1}`;
-
-            // Flatten each object in the array
-            Object.entries(item).forEach(([subKey, subValue]) => {
-              if (isEmpty(subValue)) return;
-
-              const subFullKey = `${itemKey}.${subKey}`;
-              const subLabel = `${itemLabel} > ${subKey
+          if (shouldKeepWhole) {
+            // Keep the entire array as one field to be rendered as cards
+            fields.push({
+              key: fullKey,
+              label: fullKey
                 .replace(/_/g, " ")
-                .replace(/\b\w/g, (c) => c.toUpperCase())}`;
-
-              // Handle nested arrays within array items
-              if (Array.isArray(subValue)) {
-                fields.push({
-                  key: subFullKey,
-                  label: subLabel,
-                  value: subValue,
-                });
-              } else if (typeof subValue === "object" && subValue !== null) {
-                // Flatten nested objects within array items
-                fields.push(...flattenObject(subValue, subFullKey));
-              } else {
-                fields.push({
-                  key: subFullKey,
-                  label: subLabel,
-                  value: typeof subValue === "boolean" ? (subValue ? "True" : "False") : subValue,
-                });
-              }
+                .replace(/\./g, " > ")
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
+              value: value,
             });
-          });
+          } else {
+            // Create individual fields for each object in the array
+            value.forEach((item, index) => {
+              const itemKey = `${fullKey}[${index}]`;
+              const itemLabel = `${fullKey
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())} #${index + 1}`;
+
+              // Flatten each object in the array
+              Object.entries(item).forEach(([subKey, subValue]) => {
+                if (isEmpty(subValue)) return;
+
+                const subFullKey = `${itemKey}.${subKey}`;
+                const subLabel = `${itemLabel} > ${subKey
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())}`;
+
+                // Handle nested arrays within array items
+                if (Array.isArray(subValue)) {
+                  fields.push({
+                    key: subFullKey,
+                    label: subLabel,
+                    value: subValue,
+                  });
+                } else if (typeof subValue === "object" && subValue !== null) {
+                  // Flatten nested objects within array items
+                  fields.push(...flattenObject(subValue, subFullKey));
+                } else {
+                  fields.push({
+                    key: subFullKey,
+                    label: subLabel,
+                    value: typeof subValue === "boolean" ? (subValue ? "True" : "False") : subValue,
+                  });
+                }
+              });
+            });
+          }
         } else {
           // Array of primitives
           fields.push({
@@ -128,19 +163,46 @@ const ReviewPage = () => {
     return flattenObject(currentProduct.snapshot);
   }, [currentProduct]);
 
+  // ✅ Group fields by their top-level category (preserve original order)
+  const groupedFields = useMemo(() => {
+    const groups = {};
+    const groupOrder = [];
+
+    fieldsToReview.forEach((field) => {
+      // Extract the top-level category from the field key
+      // e.g., "pricing.pricing_plans[0].plan" -> "pricing", "features" -> "features"
+      const topLevelKey = field.key.split(/[\.\[]/)[0];
+
+      // Create a human-readable section name
+      const sectionName = topLevelKey
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+      if (!groups[topLevelKey]) {
+        groups[topLevelKey] = {
+          key: topLevelKey,
+          name: sectionName,
+          fields: [],
+        };
+        groupOrder.push(topLevelKey);
+      }
+
+      groups[topLevelKey].fields.push(field);
+    });
+
+    // Return groups in the order they first appeared (preserving API order)
+    return groupOrder.map(key => groups[key]);
+  }, [fieldsToReview]);
+
   console.log("currentProduct", currentProduct);
   console.log("fieldsToReview", fieldsToReview);
+  console.log("groupedFields", groupedFields);
 
   // ✅ Compute progress
   const progress = useMemo(() => {
     if (!fieldsToReview.length) return 0;
     return Math.round((reviewed.length / fieldsToReview.length) * 100);
   }, [reviewed, fieldsToReview.length]);
-
-  // Get approved fields for the sheet
-  const approvedFields = useMemo(() => {
-    return fieldsToReview.filter((field) => reviewed.includes(field.key));
-  }, [fieldsToReview, reviewed]);
 
   // Keyboard shortcuts
   const handleApprove = () => {
@@ -183,11 +245,6 @@ const ReviewPage = () => {
     onPrevious: handlePrevious,
     enabled: !isLoading && fieldsToReview.length > 0,
   });
-
-  // Handle sidebar field click
-  const handleFieldClick = (index) => {
-    setCurrentFieldIndex(index);
-  };
 
   // Error state
   if (error) {
@@ -263,75 +320,78 @@ const ReviewPage = () => {
 
         {/* Scrollable Sidebar Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Pending Fields Section */}
+          {/* Sections Overview */}
           <div className="p-2">
             <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
-              Pending ({fieldsToReview.length - reviewed.length})
+              Sections ({groupedFields.length})
             </h3>
-            <nav className="flex flex-col space-y-0.5">
-              {fieldsToReview.map((field, index) => {
-                const isReviewed = reviewed.includes(field.key);
-                const isCurrent = currentFieldIndex === index;
+            <nav className="flex flex-col space-y-1">
+              {groupedFields.map((section) => {
+                const reviewedInSection = section.fields.filter((field) =>
+                  reviewed.includes(field.key)
+                ).length;
+                const totalInSection = section.fields.length;
+                const isComplete = reviewedInSection === totalInSection;
+                const progress = Math.round((reviewedInSection / totalInSection) * 100);
 
-                if (isReviewed) return null;
+                // Check if current field is in this section
+                const currentField = fieldsToReview[currentFieldIndex];
+                const isSectionActive = currentField &&
+                  currentField.key.startsWith(section.key);
 
                 return (
-                  <button
-                    key={field.key}
-                    onClick={() => handleFieldClick(index)}
+                  <div
+                    key={section.key}
                     className={cn(
-                      "px-2 py-1.5 rounded transition-all text-left w-full text-xs",
-                      isCurrent ? "bg-foreground text-background font-medium" : "hover:bg-muted/50"
+                      "px-2 py-2 rounded transition-all",
+                      isSectionActive && "bg-muted",
+                      isComplete && "bg-green-50"
                     )}
                   >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                          isCurrent ? "bg-background" : "bg-muted-foreground/40"
-                        )}
-                      />
-                      <p className="truncate">
-                        {field.label}
-                      </p>
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className={cn(
+                        "text-xs font-medium truncate",
+                        isComplete ? "text-green-700" : "text-foreground"
+                      )}>
+                        {section.name}
+                      </h4>
+                      {isComplete && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                      )}
                     </div>
-                  </button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-muted h-1 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full transition-all duration-300",
+                            isComplete ? "bg-green-500" : "bg-primary"
+                          )}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className={cn(
+                        "text-[10px] font-medium whitespace-nowrap",
+                        isComplete ? "text-green-600" : "text-muted-foreground"
+                      )}>
+                        {reviewedInSection}/{totalInSection}
+                      </span>
+                    </div>
+                  </div>
                 );
               })}
             </nav>
           </div>
 
-          {/* Approved Fields Section */}
-          {approvedFields.length > 0 && (
-            <>
-              <div className="h-px bg-border my-2" />
-              <div className="p-2">
-                <h3 className="text-[10px] font-semibold text-green-600 uppercase tracking-wider mb-2 px-2 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Approved ({approvedFields.length})
-                </h3>
-                <nav className="flex flex-col space-y-0.5">
-                  {approvedFields.map((field) => {
-                    const index = fieldsToReview.findIndex(f => f.key === field.key);
-                    return (
-                      <button
-                        key={field.key}
-                        onClick={() => handleFieldClick(index)}
-                        className="px-2 py-1.5 rounded transition-all text-left w-full text-xs bg-green-50 hover:bg-green-100"
-                      >
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-3 h-3 text-green-600 flex-shrink-0" />
-                          <p className="text-green-900 truncate">
-                            {field.label}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </nav>
-              </div>
-            </>
-          )}
+          {/* Quick Stats */}
+          <div className="h-px bg-border my-2" />
+          <div className="p-2 px-4">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Total Progress</span>
+              <span className="font-medium text-foreground">
+                {reviewed.length} / {fieldsToReview.length}
+              </span>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -390,6 +450,7 @@ const ReviewPage = () => {
               reviewed={reviewed}
               setReviewed={setReviewed}
               fieldsToReview={fieldsToReview}
+              groupedFields={groupedFields}
               currentFieldIndex={currentFieldIndex}
               setCurrentFieldIndex={setCurrentFieldIndex}
             />

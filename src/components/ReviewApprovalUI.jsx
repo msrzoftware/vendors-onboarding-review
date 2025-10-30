@@ -1,13 +1,15 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
 export default function ReviewApprovalUI({
   reviewed,
   fieldsToReview,
+  groupedFields,
   setReviewed,
   currentFieldIndex,
   setCurrentFieldIndex,
@@ -54,7 +56,7 @@ export default function ReviewApprovalUI({
   };
 
   // Render field value based on type
-  const renderFieldValue = (value) => {
+  const renderFieldValue = (value, fieldKey) => {
     // Case 1: Array of objects
     if (Array.isArray(value)) {
       if (value.length === 0) {
@@ -66,10 +68,100 @@ export default function ReviewApprovalUI({
       );
 
       if (isArrayOfObjects) {
+        // Special rendering for pricing plans
+        const isPricingPlans = fieldKey?.includes('pricing_plans');
+        const isFeatures = fieldKey?.includes('features');
+
+        if (isPricingPlans) {
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {value.map((plan, idx) => (
+                <Card key={idx} className="border-2 shadow-none hover:border-primary/50 transition-colors">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{plan.plan || `Plan ${idx + 1}`}</CardTitle>
+                    {plan.entity && (
+                      <p className="text-xs text-muted-foreground">{plan.entity}</p>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Price */}
+                    {plan.amount && (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold text-foreground">
+                          {plan.amount}
+                        </span>
+                        {plan.currency && (
+                          <span className="text-sm text-muted-foreground">{plan.currency}</span>
+                        )}
+                        {plan.period && (
+                          <span className="text-sm text-muted-foreground">/ {plan.period}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Free badge */}
+                    {plan.is_free && (
+                      <Badge variant="default" className="bg-green-600">Free</Badge>
+                    )}
+
+                    {/* Description */}
+                    {plan.description && Array.isArray(plan.description) && (
+                      <ul className="space-y-2 text-sm">
+                        {plan.description.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span className="text-muted-foreground">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {/* Other fields */}
+                    {Object.entries(plan).map(([k, val]) => {
+                      if (['plan', 'entity', 'amount', 'currency', 'period', 'description', 'is_free'].includes(k)) {
+                        return null;
+                      }
+                      return (
+                        <div key={k} className="text-sm">
+                          <span className="font-medium capitalize">{k.replace(/_/g, " ")}: </span>
+                          <span className="text-muted-foreground">{val?.toString?.() ?? "—"}</span>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          );
+        }
+
+        if (isFeatures) {
+          return (
+            <div className="space-y-2">
+              {value.map((feature, idx) => (
+                <Card key={idx} className="border shadow-none">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm mb-1">{feature.name}</h4>
+                        {feature.description && (
+                          <p className="text-sm text-muted-foreground">{feature.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          );
+        }
+
+        // Default rendering for other arrays of objects
         return (
           <div className="space-y-3">
             {value.map((obj, idx) => (
-              <Card key={idx} className="border-muted">
+              <Card key={idx} className="border-muted shadow-none">
                 <CardContent className="pt-4">
                   {Object.entries(obj).map(([k, val]) => (
                     <div key={k} className="flex items-start gap-3 text-sm mb-3 last:mb-0">
@@ -136,77 +228,179 @@ export default function ReviewApprovalUI({
     );
   };
 
-  return (
-    <div className="w-full h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto p-4 space-y-3">
-        {fieldsToReview.map((field, index) => {
-          const isReviewed = reviewed.includes(field.key);
-          const isCurrent = currentFieldIndex === index;
+  // Calculate section statistics
+  const sectionStats = useMemo(() => {
+    const stats = {};
 
-          return (
-            <Card
-              key={field.key}
-              ref={(el) => (fieldRefs.current[field.key] = el)}
+    groupedFields.forEach((section) => {
+      const reviewedCount = section.fields.filter((field) =>
+        reviewed.includes(field.key)
+      ).length;
+      const totalCount = section.fields.length;
+
+      stats[section.key] = {
+        reviewed: reviewedCount,
+        total: totalCount,
+        progress: Math.round((reviewedCount / totalCount) * 100),
+      };
+    });
+
+    return stats;
+  }, [groupedFields, reviewed]);
+
+  // Determine which sections should be open by default (sections with current field)
+  const currentSection = useMemo(() => {
+    if (currentFieldIndex === null || !fieldsToReview[currentFieldIndex]) return null;
+    const currentField = fieldsToReview[currentFieldIndex];
+    const topLevelKey = currentField.key.split(/[\.\[]/)[0];
+    return topLevelKey;
+  }, [currentFieldIndex, fieldsToReview]);
+
+  // Track which sections are open
+  const [openSections, setOpenSections] = useState(() =>
+    groupedFields.map(section => section.key)
+  );
+
+  // Ensure current section is always open
+  useEffect(() => {
+    if (currentSection && !openSections.includes(currentSection)) {
+      setOpenSections(prev => [...prev, currentSection]);
+    }
+  }, [currentSection]);
+
+  // Update open sections when groupedFields changes (on initial load)
+  useEffect(() => {
+    setOpenSections(groupedFields.map(section => section.key));
+  }, [groupedFields.length]);
+
+  // Render individual field card
+  const renderFieldCard = (field, index) => {
+    const isReviewed = reviewed.includes(field.key);
+    const isCurrent = currentFieldIndex === index;
+
+    return (
+      <Card
+        key={field.key}
+        ref={(el) => (fieldRefs.current[field.key] = el)}
+        className={cn(
+          "transition-all duration-200 shadow-none",
+          isReviewed && "opacity-50 bg-green-50/50 border-green-200",
+          isCurrent && !isReviewed && "border-foreground border-2",
+          !isCurrent && !isReviewed && "border-border"
+        )}
+      >
+        {/* Header with Approve Button */}
+        <CardHeader className="pb-3 px-4 pt-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                {field.label}
+                {isCurrent && !isReviewed && (
+                  <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
+                    Current
+                  </Badge>
+                )}
+              </CardTitle>
+              {isReviewed && (
+                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Approved
+                </p>
+              )}
+            </div>
+            <Button
+              onClick={() => approveField(field.key)}
+              variant={isReviewed ? "outline" : "default"}
+              size="sm"
               className={cn(
-                "transition-all duration-200 border",
-                isReviewed && "opacity-50 bg-green-50/50 border-green-200",
-                isCurrent && !isReviewed && "border-foreground shadow-sm",
-                !isCurrent && !isReviewed && "border-border"
+                "flex-shrink-0 gap-1.5 h-8 text-xs",
+                isReviewed && "border-green-500 text-green-700 hover:bg-green-50"
               )}
             >
-              {/* Header with Approve Button */}
-              <CardHeader className="pb-3 px-4 pt-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                      {field.label}
-                      {isCurrent && !isReviewed && (
-                        <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
-                          Current
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    {isReviewed && (
-                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Approved
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    onClick={() => approveField(field.key)}
-                    variant={isReviewed ? "outline" : "default"}
-                    size="sm"
+              {isReviewed ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Approved
+                </>
+              ) : (
+                <>
+                  <Circle className="w-3.5 h-3.5" />
+                  Approve
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+
+        {/* Field Value */}
+        <CardContent className="px-4 pb-4">
+          {renderFieldValue(field.value, field.key)}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="w-full h-full overflow-y-auto">
+      <div className="max-w-4xl mx-auto p-4">
+        {groupedFields.length > 0 ? (
+          <Accordion
+            type="multiple"
+            value={openSections}
+            onValueChange={setOpenSections}
+            className="space-y-4"
+          >
+            {groupedFields.map((section) => {
+              const stats = sectionStats[section.key];
+              const isComplete = stats.reviewed === stats.total;
+
+              return (
+                <AccordionItem
+                  key={section.key}
+                  value={section.key}
+                  className="border rounded-lg bg-card shadow-none"
+                >
+                  <AccordionTrigger
+                    value={section.key}
                     className={cn(
-                      "flex-shrink-0 gap-1.5 h-8 text-xs",
-                      isReviewed && "border-green-500 text-green-700 hover:bg-green-50"
+                      "hover:no-underline",
+                      isComplete && "bg-green-50/50"
                     )}
                   >
-                    {isReviewed ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Approved
-                      </>
-                    ) : (
-                      <>
-                        <Circle className="w-3.5 h-3.5" />
-                        Approve
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardHeader>
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-base font-semibold text-foreground">
+                          {section.name}
+                        </h3>
+                        <Badge
+                          variant={isComplete ? "default" : "secondary"}
+                          className={cn(
+                            "text-xs",
+                            isComplete && "bg-green-600 hover:bg-green-700"
+                          )}
+                        >
+                          {stats.reviewed} / {stats.total}
+                        </Badge>
+                      </div>
+                      {isComplete && (
+                        <CheckCircle2 className="w-5 h-5 text-green-600 mr-2" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
 
-              {/* Field Value */}
-              <CardContent className="px-4 pb-4">
-                {renderFieldValue(field.value)}
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        {/* Empty State */}
-        {fieldsToReview.length === 0 && (
+                  <AccordionContent value={section.key}>
+                    <div className="px-4 space-y-3">
+                      {section.fields.map((field) => {
+                        const index = fieldsToReview.findIndex(f => f.key === field.key);
+                        return renderFieldCard(field, index);
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        ) : (
           <Card>
             <CardContent className="text-center py-12">
               <p className="text-muted-foreground text-sm">
