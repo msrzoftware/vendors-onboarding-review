@@ -57,6 +57,12 @@ const ReviewPage = () => {
         }
       }
 
+      // Skip fields that should never be shown
+      const skipFields = ['review_sources'];
+      if (skipFields.includes(key) || (parentKey && skipFields.some(f => fullKey.includes(f)))) {
+        return;
+      }
+
       // Handle arrays
       if (Array.isArray(value)) {
         // Check if array of objects
@@ -339,13 +345,20 @@ const ReviewPage = () => {
                 const isSectionActive = currentField &&
                   currentField.key.startsWith(section.key);
 
+                // Find first field in this section
+                const firstFieldIndex = fieldsToReview.findIndex(f =>
+                  f.key.startsWith(section.key)
+                );
+
                 return (
-                  <div
+                  <button
                     key={section.key}
+                    onClick={() => firstFieldIndex >= 0 && setCurrentFieldIndex(firstFieldIndex)}
                     className={cn(
-                      "px-2 py-2 rounded transition-all",
+                      "px-2 py-2 rounded transition-all text-left w-full",
                       isSectionActive && "bg-muted",
-                      isComplete && "bg-green-50"
+                      isComplete && "bg-green-50",
+                      "hover:bg-muted/50 cursor-pointer"
                     )}
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -376,7 +389,7 @@ const ReviewPage = () => {
                         {reviewedInSection}/{totalInSection}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </nav>

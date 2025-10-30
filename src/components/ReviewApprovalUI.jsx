@@ -57,6 +57,12 @@ export default function ReviewApprovalUI({
 
   // Render field value based on type
   const renderFieldValue = (value, fieldKey) => {
+    // Special handling for review strengths and weaknesses - show as bullet points
+    const isReviewStrengthsOrWeakness = fieldKey?.includes('review_strengths') ||
+                                        fieldKey?.includes('reviews_strengths') ||
+                                        fieldKey?.includes('reviews_weakness') ||
+                                        fieldKey?.includes('review_weakness');
+
     // Case 1: Array of objects
     if (Array.isArray(value)) {
       if (value.length === 0) {
@@ -163,34 +169,65 @@ export default function ReviewApprovalUI({
             {value.map((obj, idx) => (
               <Card key={idx} className="border-muted shadow-none">
                 <CardContent className="pt-4">
-                  {Object.entries(obj).map(([k, val]) => (
-                    <div key={k} className="flex items-start gap-3 text-sm mb-3 last:mb-0">
-                      <span className="font-medium text-foreground min-w-32 capitalize">
-                        {k.replace(/_/g, " ")}:
-                      </span>
-                      <span className="text-muted-foreground flex-1">
-                        {Array.isArray(val) ? (
-                          <ul className="list-disc pl-5 space-y-1">
-                            {val.map((item, i) => (
-                              <li key={i}>{item?.toString?.() ?? "—"}</li>
-                            ))}
-                          </ul>
-                        ) : typeof val === "object" && val !== null ? (
-                          <pre className="whitespace-pre-wrap text-xs bg-muted border rounded p-2 overflow-x-auto">
-                            {JSON.stringify(val, null, 2)}
-                          </pre>
-                        ) : (
-                          val?.toString?.() ?? "—"
-                        )}
-                      </span>
-                    </div>
-                  ))}
+                  {Object.entries(obj)
+                    .filter(([k, val]) => {
+                      // Skip empty/null values
+                      if (val === null || val === undefined || val === "") return false;
+                      // Skip logo field if it's empty or just a dash
+                      if (k === "logo" && (!val || val === "—")) return false;
+                      return true;
+                    })
+                    .map(([k, val]) => {
+                      // Format label - capitalize normally, but make URL all caps
+                      let label = k.replace(/_/g, " ");
+                      if (label.toLowerCase() === "url") {
+                        label = "URL";
+                      } else {
+                        label = label.replace(/\b\w/g, (c) => c.toUpperCase());
+                      }
+
+                      return (
+                        <div key={k} className="flex items-start gap-3 text-sm mb-3 last:mb-0">
+                          <span className="font-medium text-foreground min-w-32">
+                            {label}:
+                          </span>
+                          <span className="text-muted-foreground flex-1">
+                            {Array.isArray(val) ? (
+                              <ul className="list-disc pl-5 space-y-1">
+                                {val.map((item, i) => (
+                                  <li key={i}>{item?.toString?.() ?? "—"}</li>
+                                ))}
+                              </ul>
+                            ) : typeof val === "object" && val !== null ? (
+                              <pre className="whitespace-pre-wrap text-xs bg-muted border rounded p-2 overflow-x-auto">
+                                {JSON.stringify(val, null, 2)}
+                              </pre>
+                            ) : (
+                              val?.toString?.() ?? "—"
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
                 </CardContent>
               </Card>
             ))}
           </div>
         );
       } else {
+        // Array of primitives
+        if (isReviewStrengthsOrWeakness) {
+          // Show as bullet points for review strengths/weaknesses
+          return (
+            <ul className="list-disc pl-5 space-y-1.5 text-sm">
+              {value.map((item, i) => (
+                <li key={i} className="text-muted-foreground">{item?.toString?.() ?? "—"}</li>
+              ))}
+            </ul>
+          );
+        }
+
+        // Default: show as badges
         return (
           <div className="flex flex-wrap gap-2">
             {value.map((item, i) => (
@@ -213,12 +250,31 @@ export default function ReviewApprovalUI({
     }
 
     // Case 3: Primitives (string, number, boolean, null)
-    if (typeof value === "string" && value.length > 200) {
-      return (
-        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-          {value}
-        </p>
-      );
+    if (typeof value === "string") {
+      // Check if this is HTML content (for software_analysis fields)
+      const isHTML = value.includes('<p>') || value.includes('<ul>') || value.includes('<li>') || value.includes('<strong>');
+      const isSoftwareAnalysis = fieldKey?.includes('software_analysis');
+
+      if (isHTML && isSoftwareAnalysis) {
+        // Render HTML content
+        return (
+          <div
+            className="text-sm leading-relaxed prose prose-sm max-w-none
+                       prose-p:my-2 prose-ul:my-2 prose-li:my-1
+                       prose-strong:font-semibold prose-strong:text-foreground"
+            dangerouslySetInnerHTML={{ __html: value }}
+          />
+        );
+      }
+
+      // Long text
+      if (value.length > 200) {
+        return (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {value}
+          </p>
+        );
+      }
     }
 
     return (
@@ -273,8 +329,26 @@ export default function ReviewApprovalUI({
     setOpenSections(groupedFields.map(section => section.key));
   }, [groupedFields.length]);
 
+  // Auto-collapse sections when all fields are approved
+  useEffect(() => {
+    const completedSections = groupedFields
+      .filter(section => {
+        const allFieldsReviewed = section.fields.every(field =>
+          reviewed.includes(field.key)
+        );
+        return allFieldsReviewed && section.fields.length > 0;
+      })
+      .map(section => section.key);
+
+    if (completedSections.length > 0) {
+      setOpenSections(prev =>
+        prev.filter(key => !completedSections.includes(key))
+      );
+    }
+  }, [reviewed, groupedFields]);
+
   // Render individual field card
-  const renderFieldCard = (field, index) => {
+  const renderFieldCard = (field, index, isOnlyFieldInSection = false) => {
     const isReviewed = reviewed.includes(field.key);
     const isCurrent = currentFieldIndex === index;
 
@@ -285,35 +359,86 @@ export default function ReviewApprovalUI({
         className={cn(
           "transition-all duration-200 shadow-none",
           isReviewed && "opacity-50 bg-green-50/50 border-green-200",
-          isCurrent && !isReviewed && "border-foreground border-2",
+          isCurrent && !isReviewed && "border-yellow-500 border-2 bg-yellow-50/30",
           !isCurrent && !isReviewed && "border-border"
         )}
       >
-        {/* Header with Approve Button */}
-        <CardHeader className="pb-3 px-4 pt-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                {field.label}
-                {isCurrent && !isReviewed && (
-                  <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
-                    Current
-                  </Badge>
+        {/* Header with Approve Button - only show if NOT the only field in section */}
+        {!isOnlyFieldInSection && (
+          <CardHeader className="pb-2 px-3 pt-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  {field.label}
+                  {isCurrent && !isReviewed && (
+                    <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
+                      Current
+                    </Badge>
+                  )}
+                </CardTitle>
+                {isReviewed && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Approved
+                  </p>
                 )}
-              </CardTitle>
-              {isReviewed && (
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Approved
-                </p>
-              )}
+              </div>
+              <Button
+                onClick={() => approveField(field.key)}
+                variant={isReviewed ? "outline" : "default"}
+                size="sm"
+                className={cn(
+                  "flex-shrink-0 gap-1.5 h-8 text-xs",
+                  isReviewed && "border-green-500 text-green-700 hover:bg-green-50"
+                )}
+              >
+                {isReviewed ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Approved
+                  </>
+                ) : (
+                  <>
+                    <Circle className="w-3.5 h-3.5" />
+                    Approve
+                  </>
+                )}
+              </Button>
             </div>
+          </CardHeader>
+        )}
+
+        {/* For single-field sections, show status badges at top */}
+        {isOnlyFieldInSection && (
+          <div className="px-3 pt-3">
+            {isCurrent && !isReviewed && (
+              <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
+                Current
+              </Badge>
+            )}
+            {isReviewed && (
+              <p className="text-xs text-green-600 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Approved
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Field Value */}
+        <CardContent className={cn("px-3", isOnlyFieldInSection ? "pt-2 pb-3" : "pb-3")}>
+          {renderFieldValue(field.value, field.key)}
+        </CardContent>
+
+        {/* For single-field sections, show approve button at bottom-right */}
+        {isOnlyFieldInSection && (
+          <div className="px-3 pb-3 flex justify-end">
             <Button
               onClick={() => approveField(field.key)}
               variant={isReviewed ? "outline" : "default"}
               size="sm"
               className={cn(
-                "flex-shrink-0 gap-1.5 h-8 text-xs",
+                "gap-1.5 h-8 text-xs",
                 isReviewed && "border-green-500 text-green-700 hover:bg-green-50"
               )}
             >
@@ -330,12 +455,7 @@ export default function ReviewApprovalUI({
               )}
             </Button>
           </div>
-        </CardHeader>
-
-        {/* Field Value */}
-        <CardContent className="px-4 pb-4">
-          {renderFieldValue(field.value, field.key)}
-        </CardContent>
+        )}
       </Card>
     );
   };
@@ -368,10 +488,13 @@ export default function ReviewApprovalUI({
                     )}
                   >
                     <div className="flex items-center justify-between w-full pr-4">
+                      <h3 className="text-base font-semibold text-foreground">
+                        {section.name}
+                      </h3>
                       <div className="flex items-center gap-3">
-                        <h3 className="text-base font-semibold text-foreground">
-                          {section.name}
-                        </h3>
+                        {isComplete && (
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        )}
                         <Badge
                           variant={isComplete ? "default" : "secondary"}
                           className={cn(
@@ -382,9 +505,6 @@ export default function ReviewApprovalUI({
                           {stats.reviewed} / {stats.total}
                         </Badge>
                       </div>
-                      {isComplete && (
-                        <CheckCircle2 className="w-5 h-5 text-green-600 mr-2" />
-                      )}
                     </div>
                   </AccordionTrigger>
 
@@ -392,7 +512,8 @@ export default function ReviewApprovalUI({
                     <div className="px-4 space-y-3">
                       {section.fields.map((field) => {
                         const index = fieldsToReview.findIndex(f => f.key === field.key);
-                        return renderFieldCard(field, index);
+                        const isOnlyField = section.fields.length === 1;
+                        return renderFieldCard(field, index, isOnlyField);
                       })}
                     </div>
                   </AccordionContent>
